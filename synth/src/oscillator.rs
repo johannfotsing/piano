@@ -19,6 +19,8 @@ pub enum Waveform {
 pub struct Oscillator {
     frequency: f32,
     sample_rate: f32,
+    /// The current phase of the oscillator, in the range [0.0, 1.0).
+    /// This represents the position in the waveform cycle, where 0.0 is the start of the cycle and 1.0 is the end.
     phase: f32,
     waveform: Waveform,
 }
@@ -44,23 +46,14 @@ impl Oscillator {
     /// Returns a value between -1.0 and 1.0.
     pub fn next_sample(&mut self) -> f32 {
         let sample = match self.waveform {
-          Waveform::Sine => (self.phase * TAU).sin(),
-          Waveform::Square => {
-              let value = (self.phase * TAU).sin();
-              if value >= 0.0 {
-                  1.0
-              } else {
-                  -1.0
-              }
-          }
-          Waveform::Triangle => {
-              let value = (self.phase * TAU).sin();
-              2.0 * value.abs() - 1.0
-          }
-          Waveform::Sawtooth => {
-              let value = (self.phase * TAU).sin();
-              2.0 * value - 1.0
-          }
+            Waveform::Sine => (self.phase * TAU).sin(),
+            Waveform::Square => {
+                if self.phase < 0.5 { 1.0 } else { -1.0 }
+            }
+            Waveform::Sawtooth => 2.0 * self.phase - 1.0,
+            // sign(0.5 - phi) and phi % 0.5 might create a discontiunity at phi = 0.5, but it is a triangle wave.
+            Waveform::Triangle => (0.5 - self.phase).signum() * (4.0 * (self.phase % 0.5) - 1.0),
+            // TODO: add duty cycle for square wave and triangle wave, and add more waveforms like pulse, noise, etc.
         };
 
         self.advance_phase();
