@@ -16,6 +16,7 @@ pub struct Adsr {
     state: EnvelopeState,
 
     current_level: f32,
+    release_start_level: f32,
     sample_counter: u32,
 }
 
@@ -39,6 +40,7 @@ impl Adsr {
             state: EnvelopeState::Idle,
 
             current_level: 0.0,
+            release_start_level: 0.0,
 
             sample_counter: 0,
         }
@@ -50,6 +52,7 @@ impl Adsr {
     }
 
     pub fn note_off(&mut self) {
+        self.release_start_level = self.current_level;
         self.state = EnvelopeState::Release;
         self.sample_counter = 0;
     }
@@ -113,13 +116,14 @@ impl Adsr {
                 } else {
                     let progress = self.sample_counter as f32 / self.release_samples as f32;
 
-                    self.current_level *= 1.0 - progress;
+                    self.current_level = self.release_start_level * (1.0 - progress);
 
                     self.sample_counter += 1;
 
                     if self.sample_counter >= self.release_samples {
                         self.current_level = 0.0;
                         self.state = EnvelopeState::Idle;
+                        self.sample_counter = 0;
                     }
                 }
             }
