@@ -12,7 +12,7 @@ impl Voice {
     pub fn new(note: u8, frequency: f32, velocity: u8, sample_rate: f32) -> Self {
         let mut envelope = Adsr::new(
             sample_rate,
-            0.3, // attack 300ms
+            0.1, // attack 300ms
             0.2,  // decay 200ms
             0.7,  // sustain 70%
             0.5,  // release 500ms
