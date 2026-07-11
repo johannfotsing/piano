@@ -4,6 +4,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 use engine::App;
 use music::event::NoteEvent;
+use synth::Synthesizer;
 
 pub fn start_audio(receiver: Receiver<NoteEvent>) -> cpal::Stream {
     let host = cpal::default_host();
@@ -18,7 +19,8 @@ pub fn start_audio(receiver: Receiver<NoteEvent>) -> cpal::Stream {
 
     // Use the rate selected by the actual audio device.
     let sample_rate = config.sample_rate as f32;
-    let mut app = App::new(sample_rate);
+    let synthesizer = Synthesizer::new(sample_rate);
+    let mut app = App::new(synthesizer);
 
     let stream = match supported_config.sample_format() {
         cpal::SampleFormat::F32 => {

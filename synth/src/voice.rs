@@ -1,15 +1,16 @@
 use crate::{Adsr, Oscillator};
+use music::note::Note;
 
 pub struct Voice {
     oscillator: Oscillator,
     envelope: Adsr,
 
-    note: u8,
+    note: Note,
     velocity: f32,
 }
 
 impl Voice {
-    pub fn new(note: u8, frequency: f32, velocity: u8, sample_rate: f32) -> Self {
+    pub fn new(note: Note, velocity: u8, sample_rate: f32) -> Self {
         let mut envelope = Adsr::new(
             sample_rate,
             0.1, // attack 300ms
@@ -21,7 +22,7 @@ impl Voice {
         envelope.note_on();
 
         Self {
-            oscillator: Oscillator::new(frequency, sample_rate),
+            oscillator: Oscillator::new(note.frequency() as f32, sample_rate),
 
             envelope,
 
@@ -41,7 +42,7 @@ impl Voice {
         self.envelope.note_off();
     }
 
-    pub fn note(&self) -> u8 {
+    pub fn note(&self) -> Note {
         self.note
     }
 

@@ -3,7 +3,6 @@ mod keyboard;
 
 use std::sync::mpsc::{self, Sender};
 
-use engine::App;
 use music::event::NoteEvent;
 use winit::{
     application::ApplicationHandler,
@@ -87,7 +86,6 @@ fn main() {
         }
     };
 
-    // let app = App::new(44_100.0);
     let _stream = audio::start_audio(event_receiver);
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
