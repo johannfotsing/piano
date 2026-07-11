@@ -87,8 +87,8 @@ fn main() {
         }
     };
 
-    let app = App::new(44_100.0);
-    let _stream = audio::start_audio(event_receiver, app);
+    // let app = App::new(44_100.0);
+    let _stream = audio::start_audio(event_receiver);
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
     let mut desktop_app = DesktopApp {
