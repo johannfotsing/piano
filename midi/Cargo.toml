@@ -1,0 +1,12 @@
+[package]
+name = "midi"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+desktop-input = ["dep:midir"]
+
+[dependencies]
+music = { path = "../music" }
+midir = { version = "0.11", optional = true }

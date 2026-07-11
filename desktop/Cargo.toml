@@ -1,0 +1,12 @@
+[package]
+name = "desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+music = { path = "../music" }
+synth = { path = "../synth" }
+engine = { path = "../engine" }
+midi = { path = "../midi", features = ["desktop-input"] }
+cpal = "^0.18.1"
+winit = "0.30"

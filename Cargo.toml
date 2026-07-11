@@ -1,0 +1,4 @@
+[workspace]
+members = ["synth", "desktop", "stm32", "music", "midi", "engine"]
+
+resolver = "2"
