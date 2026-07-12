@@ -19,28 +19,24 @@ fn main() -> eframe::Result {
     let (midi_sender, midi_receiver) = mpsc::channel();
     let (command_sender, command_receiver) = mpsc::channel();
 
-    let _midi_connection = match midi::connect_input(midi_sender) {
-        Ok(connection) => connection,
-        Err(error) => {
-            eprintln!("Could not initialize MIDI input: {error}");
-            None
-        }
-    };
     let _stream = audio::start_audio(midi_receiver, command_receiver, instruments);
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1_050.0, 760.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([1_050.0, 760.0])
+            .with_maximized(true),
         ..Default::default()
     };
 
     eframe::run_native(
-        "OpenRSynth",
+        "OpenRSynth - Desktop",
         options,
         Box::new(move |_creation_context| {
             Ok(Box::new(PresetEditor::new(
                 bank,
                 preset_path,
                 command_sender,
+                midi_sender,
             )))
         }),
     )

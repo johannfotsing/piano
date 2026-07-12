@@ -1,14 +1,13 @@
 use music::{event::NoteEvent, note::Note};
 
 #[cfg(feature = "desktop-input")]
-use std::{
-    error::Error,
-    io::{self, Write},
-    sync::mpsc::Sender,
-};
+use std::{error::Error, sync::mpsc::Sender};
 
 #[cfg(feature = "desktop-input")]
 use midir::{Ignore, MidiInput, MidiInputConnection};
+
+#[cfg(feature = "desktop-input")]
+pub type InputConnection = MidiInputConnection<()>;
 
 /// Converts a raw MIDI message into an event understood by the OpenRSynth engine.
 ///
@@ -32,55 +31,35 @@ pub fn parse_message(message: &[u8]) -> Option<NoteEvent> {
     }
 }
 
+/// Returns the display names of all currently available MIDI input ports.
 #[cfg(feature = "desktop-input")]
-fn read_port_selection(port_count: usize) -> Result<usize, Box<dyn Error>> {
-    loop {
-        print!("Select a MIDI input port [0-{}]: ", port_count - 1);
-        io::stdout().flush()?;
-
-        let mut selection = String::new();
-        if io::stdin().read_line(&mut selection)? == 0 {
-            return Err("standard input closed before a MIDI port was selected".into());
-        }
-
-        match selection.trim().parse::<usize>() {
-            Ok(index) if index < port_count => return Ok(index),
-            _ => eprintln!("Please enter a number from 0 to {}.", port_count - 1),
-        }
-    }
+pub fn input_ports() -> Result<Vec<String>, Box<dyn Error>> {
+    let midi_input = MidiInput::new("openrsynth-input-list")?;
+    midi_input
+        .ports()
+        .iter()
+        .map(|port| midi_input.port_name(port).map_err(Into::into))
+        .collect()
 }
 
-/// Opens an available MIDI input port.
+/// Opens the MIDI input port at `port_index`.
 ///
-/// The returned connection must remain alive while MIDI input is needed. If no
-/// device is connected, this returns `Ok(None)` so computer-keyboard input can
-/// continue to work normally. A single port is connected automatically; when
-/// multiple ports are available, the user is prompted to select one.
+/// The returned connection must remain alive while MIDI input is needed.
 #[cfg(feature = "desktop-input")]
-pub fn connect_input(
+pub fn connect_input_port(
+    port_index: usize,
     event_sender: Sender<NoteEvent>,
-) -> Result<Option<MidiInputConnection<()>>, Box<dyn Error>> {
+) -> Result<InputConnection, Box<dyn Error>> {
     let mut midi_input = MidiInput::new("openrsynth-input")?;
     midi_input.ignore(Ignore::None);
 
     let ports = midi_input.ports();
-    if ports.is_empty() {
-        println!("No MIDI input device found; computer keyboard input is still available.");
-        return Ok(None);
-    }
-
-    println!("Available MIDI input ports:");
-    for (index, port) in ports.iter().enumerate() {
-        println!("  {index}: {}", midi_input.port_name(port)?);
-    }
-
-    let port_index = if ports.len() == 1 {
-        0
-    } else {
-        read_port_selection(ports.len())?
-    };
-    let port = &ports[port_index];
-    let port_name = midi_input.port_name(port)?;
+    let port = ports.get(port_index).ok_or_else(|| {
+        format!(
+            "MIDI input port {port_index} is unavailable; {} ports were found",
+            ports.len()
+        )
+    })?;
     let connection = midi_input.connect(
         port,
         "openrsynth-midi-reader",
@@ -92,8 +71,7 @@ pub fn connect_input(
         (),
     )?;
 
-    println!("Connected to MIDI input: {port_name}");
-    Ok(Some(connection))
+    Ok(connection)
 }
 
 #[cfg(test)]

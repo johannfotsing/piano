@@ -17,6 +17,8 @@ pub struct PresetBank {
 pub struct Preset {
     #[serde(rename = "@name")]
     pub name: String,
+    #[serde(rename = "@group", default = "default_preset_group")]
+    pub group: String,
     #[serde(rename = "oscillator", default)]
     pub oscillators: Vec<OscillatorPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -35,6 +37,10 @@ pub struct Preset {
     pub reverb: Option<ReverbPreset>,
     #[serde(default)]
     pub envelope: EnvelopePreset,
+}
+
+fn default_preset_group() -> String {
+    "General".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -442,6 +448,7 @@ mod tests {
         let instruments = bank.to_instruments().unwrap();
 
         assert_eq!(instruments[0].name(), "Warm");
+        assert_eq!(bank.presets[0].group, "General");
         assert_eq!(instruments[0].oscillators().len(), 2);
         assert_eq!(instruments[0].oscillators()[0].frequency_ratio(), 2.01);
         assert!(instruments[0].hammer().is_some());
@@ -469,8 +476,11 @@ mod tests {
 
         assert_eq!(bank.presets.len(), 11);
         assert_eq!(bank.presets[4].name, "Warm");
+        assert_eq!(bank.presets[4].group, "Synths");
         assert_eq!(bank.presets[5].name, "Classical Piano");
+        assert_eq!(bank.presets[5].group, "Keyboards");
         assert_eq!(bank.presets[6].name, "Classical Guitar");
+        assert_eq!(bank.presets[6].group, "Strings");
         assert_eq!(bank.presets[7].name, "Bass Guitar");
         assert_eq!(bank.presets[8].name, "Brasses");
         assert_eq!(bank.presets[9].name, "Flute");
