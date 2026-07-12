@@ -209,9 +209,7 @@ The engine doesn't care where notes originate.
 
 ### Milestone: You can play from either your computer keyboard or your MIDI keyboard
 
----
-
-Phase 9 – Better Synth
+## Phase 9 – Better Synth
 
 Improve the sound.
 
@@ -226,6 +224,8 @@ Add:
 - [x] tremolo
 
 At this point, you're building a real synthesizer.
+
+---
 
 ## CHAT GPT's project roadmap
 

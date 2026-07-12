@@ -7,6 +7,57 @@ pub enum EnvelopeState {
     Release,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EnvelopeSettings {
+    attack_seconds: f32,
+    decay_seconds: f32,
+    sustain_level: f32,
+    release_seconds: f32,
+}
+
+impl EnvelopeSettings {
+    pub fn new(
+        attack_seconds: f32,
+        decay_seconds: f32,
+        sustain_level: f32,
+        release_seconds: f32,
+    ) -> Self {
+        assert!(attack_seconds.is_finite() && attack_seconds >= 0.0);
+        assert!(decay_seconds.is_finite() && decay_seconds >= 0.0);
+        assert!(sustain_level.is_finite() && (0.0..=1.0).contains(&sustain_level));
+        assert!(release_seconds.is_finite() && release_seconds >= 0.0);
+
+        Self {
+            attack_seconds,
+            decay_seconds,
+            sustain_level,
+            release_seconds,
+        }
+    }
+
+    pub const fn attack_seconds(&self) -> f32 {
+        self.attack_seconds
+    }
+
+    pub const fn decay_seconds(&self) -> f32 {
+        self.decay_seconds
+    }
+
+    pub const fn sustain_level(&self) -> f32 {
+        self.sustain_level
+    }
+
+    pub const fn release_seconds(&self) -> f32 {
+        self.release_seconds
+    }
+}
+
+impl Default for EnvelopeSettings {
+    fn default() -> Self {
+        Self::new(0.1, 0.2, 0.7, 0.5)
+    }
+}
+
 pub struct Adsr {
     attack_samples: u32,
     decay_samples: u32,
@@ -21,6 +72,16 @@ pub struct Adsr {
 }
 
 impl Adsr {
+    pub fn from_settings(sample_rate: f32, settings: EnvelopeSettings) -> Self {
+        Self::new(
+            sample_rate,
+            settings.attack_seconds(),
+            settings.decay_seconds(),
+            settings.sustain_level(),
+            settings.release_seconds(),
+        )
+    }
+
     pub fn new(
         sample_rate: f32,
         attack_seconds: f32,

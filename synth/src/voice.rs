@@ -30,13 +30,7 @@ pub struct Voice {
 
 impl Voice {
     pub fn new(note: Note, velocity: u8, sample_rate: f32, instrument: &Instrument) -> Self {
-        let mut envelope = Adsr::new(
-            sample_rate,
-            0.1, // attack 100ms
-            0.2, // decay 200ms
-            0.7, // sustain 70%
-            0.5, // release 500ms
-        );
+        let mut envelope = Adsr::from_settings(sample_rate, instrument.envelope());
 
         envelope.note_on();
 

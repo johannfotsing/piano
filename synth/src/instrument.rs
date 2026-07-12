@@ -1,4 +1,4 @@
-use crate::{FilterSettings, Waveform};
+use crate::{EnvelopeSettings, FilterSettings, Waveform};
 
 /// An oscillator definition and its contribution to an instrument's sound.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -75,27 +75,29 @@ impl OscillatorAssignment {
 /// A synthesizer preset used when creating new voices.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instrument {
-    name: &'static str,
+    name: String,
     oscillators: Vec<OscillatorAssignment>,
     vibrato: Option<Vibrato>,
     tremolo: Option<Tremolo>,
     filter: Option<FilterSettings>,
+    envelope: EnvelopeSettings,
 }
 
 impl Instrument {
-    pub fn new(name: &'static str, oscillators: Vec<OscillatorAssignment>) -> Self {
+    pub fn new(name: impl Into<String>, oscillators: Vec<OscillatorAssignment>) -> Self {
         assert!(!oscillators.is_empty());
         Self {
-            name,
+            name: name.into(),
             oscillators,
             vibrato: None,
             tremolo: None,
             filter: None,
+            envelope: EnvelopeSettings::default(),
         }
     }
 
-    pub const fn name(&self) -> &'static str {
-        self.name
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn oscillators(&self) -> &[OscillatorAssignment] {
@@ -127,6 +129,15 @@ impl Instrument {
 
     pub const fn filter(&self) -> Option<FilterSettings> {
         self.filter
+    }
+
+    pub fn with_envelope(mut self, envelope: EnvelopeSettings) -> Self {
+        self.envelope = envelope;
+        self
+    }
+
+    pub const fn envelope(&self) -> EnvelopeSettings {
+        self.envelope
     }
 }
 

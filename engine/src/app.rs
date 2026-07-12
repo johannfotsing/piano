@@ -1,7 +1,5 @@
 use music::event::NoteEvent;
-use synth::{
-    FilterSettings, Instrument, OscillatorAssignment, Synthesizer, Tremolo, Vibrato, Waveform,
-};
+use synth::{Instrument, Synthesizer};
 
 pub struct App {
     synthesizer: Synthesizer,
@@ -12,19 +10,33 @@ pub struct App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use synth::{OscillatorAssignment, Waveform};
+
+    fn test_app() -> App {
+        App::new(
+            Synthesizer::new(44_100.0),
+            vec![
+                Instrument::new("Sine", vec![OscillatorAssignment::new(Waveform::Sine, 1.0)]),
+                Instrument::new(
+                    "Warm",
+                    vec![OscillatorAssignment::new(Waveform::Triangle, 1.0)],
+                ),
+            ],
+        )
+    }
 
     #[test]
     fn program_change_selects_an_instrument() {
-        let mut app = App::new(Synthesizer::new(44_100.0));
+        let mut app = test_app();
 
-        app.handle_event(NoteEvent::ProgramChange { program: 4 });
+        app.handle_event(NoteEvent::ProgramChange { program: 1 });
 
         assert_eq!(app.selected_instrument().name(), "Warm");
     }
 
     #[test]
     fn invalid_program_keeps_the_current_instrument() {
-        let mut app = App::new(Synthesizer::new(44_100.0));
+        let mut app = test_app();
 
         app.handle_event(NoteEvent::ProgramChange { program: 99 });
 
@@ -33,34 +45,12 @@ mod tests {
 }
 
 impl App {
-    pub fn new(synthesizer: Synthesizer) -> Self {
+    pub fn new(synthesizer: Synthesizer, instruments: Vec<Instrument>) -> Self {
+        assert!(!instruments.is_empty());
+
         Self {
             synthesizer,
-            instruments: vec![
-                Instrument::new("Sine", vec![OscillatorAssignment::new(Waveform::Sine, 1.0)]),
-                Instrument::new(
-                    "Square",
-                    vec![OscillatorAssignment::new(Waveform::Square, 1.0)],
-                ),
-                Instrument::new(
-                    "Triangle",
-                    vec![OscillatorAssignment::new(Waveform::Triangle, 1.0)],
-                ),
-                Instrument::new(
-                    "Sawtooth",
-                    vec![OscillatorAssignment::new(Waveform::Sawtooth, 1.0)],
-                ),
-                Instrument::new(
-                    "Warm",
-                    vec![
-                        OscillatorAssignment::new(Waveform::Triangle, 0.7),
-                        OscillatorAssignment::new(Waveform::Sine, 0.3),
-                    ],
-                )
-                .with_filter(FilterSettings::low_pass(2_500.0, 0.707))
-                .with_vibrato(Vibrato::new(5.0, 12.0))
-                .with_tremolo(Tremolo::new(4.0, 0.2)),
-            ],
+            instruments,
             selected_instrument: 0,
         }
     }
@@ -110,6 +100,16 @@ impl App {
         }
 
         self.selected_instrument = index;
+        true
+    }
+
+    pub fn replace_instruments(&mut self, instruments: Vec<Instrument>) -> bool {
+        if instruments.is_empty() {
+            return false;
+        }
+
+        self.instruments = instruments;
+        self.selected_instrument = self.selected_instrument.min(self.instruments.len() - 1);
         true
     }
 }

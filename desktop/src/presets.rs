@@ -1,0 +1,325 @@
+use std::{fs, path::Path};
+
+use serde::{Deserialize, Serialize};
+use synth::{
+    EnvelopeSettings, FilterMode, FilterSettings, Instrument, OscillatorAssignment, Tremolo,
+    Vibrato, Waveform,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename = "presets")]
+pub struct PresetBank {
+    #[serde(rename = "preset", default)]
+    pub presets: Vec<Preset>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Preset {
+    #[serde(rename = "@name")]
+    pub name: String,
+    #[serde(rename = "oscillator", default)]
+    pub oscillators: Vec<OscillatorPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub filter: Option<FilterPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vibrato: Option<VibratoPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tremolo: Option<TremoloPreset>,
+    #[serde(default)]
+    pub envelope: EnvelopePreset,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OscillatorPreset {
+    #[serde(rename = "@waveform")]
+    pub waveform: WaveformPreset,
+    #[serde(rename = "@gain")]
+    pub gain: f32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WaveformPreset {
+    Sine,
+    Square,
+    Triangle,
+    Sawtooth,
+}
+
+impl WaveformPreset {
+    pub const ALL: [Self; 4] = [Self::Sine, Self::Square, Self::Triangle, Self::Sawtooth];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Sine => "Sine",
+            Self::Square => "Square",
+            Self::Triangle => "Triangle",
+            Self::Sawtooth => "Sawtooth",
+        }
+    }
+
+    const fn into_domain(self) -> Waveform {
+        match self {
+            Self::Sine => Waveform::Sine,
+            Self::Square => Waveform::Square,
+            Self::Triangle => Waveform::Triangle,
+            Self::Sawtooth => Waveform::Sawtooth,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FilterPreset {
+    #[serde(rename = "@mode")]
+    pub mode: FilterModePreset,
+    #[serde(rename = "@cutoff_hz")]
+    pub cutoff_hz: f32,
+    #[serde(rename = "@resonance_q")]
+    pub resonance_q: f32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FilterModePreset {
+    LowPass,
+    BandPass,
+    HighPass,
+}
+
+impl FilterModePreset {
+    pub const ALL: [Self; 3] = [Self::LowPass, Self::BandPass, Self::HighPass];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::LowPass => "Low-pass",
+            Self::BandPass => "Band-pass",
+            Self::HighPass => "High-pass",
+        }
+    }
+
+    const fn into_domain(self) -> FilterMode {
+        match self {
+            Self::LowPass => FilterMode::LowPass,
+            Self::BandPass => FilterMode::BandPass,
+            Self::HighPass => FilterMode::HighPass,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VibratoPreset {
+    #[serde(rename = "@rate_hz")]
+    pub rate_hz: f32,
+    #[serde(rename = "@depth_cents")]
+    pub depth_cents: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TremoloPreset {
+    #[serde(rename = "@rate_hz")]
+    pub rate_hz: f32,
+    #[serde(rename = "@depth")]
+    pub depth: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EnvelopePreset {
+    #[serde(rename = "@attack_seconds")]
+    pub attack_seconds: f32,
+    #[serde(rename = "@decay_seconds")]
+    pub decay_seconds: f32,
+    #[serde(rename = "@sustain_level")]
+    pub sustain_level: f32,
+    #[serde(rename = "@release_seconds")]
+    pub release_seconds: f32,
+}
+
+impl Default for EnvelopePreset {
+    fn default() -> Self {
+        Self {
+            attack_seconds: 0.1,
+            decay_seconds: 0.2,
+            sustain_level: 0.7,
+            release_seconds: 0.5,
+        }
+    }
+}
+
+impl PresetBank {
+    pub fn load(path: &Path) -> Result<Self, String> {
+        let xml = fs::read_to_string(path)
+            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+        Self::from_xml(&xml)
+    }
+
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        let xml = self.to_xml()?;
+        fs::write(
+            path,
+            format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{xml}\n"),
+        )
+        .map_err(|error| format!("Could not write {}: {error}", path.display()))
+    }
+
+    pub fn from_xml(xml: &str) -> Result<Self, String> {
+        let bank: Self =
+            quick_xml::de::from_str(xml).map_err(|error| format!("Invalid preset XML: {error}"))?;
+        bank.to_instruments()?;
+        Ok(bank)
+    }
+
+    pub fn to_xml(&self) -> Result<String, String> {
+        quick_xml::se::to_string(self)
+            .map_err(|error| format!("Could not serialize presets: {error}"))
+    }
+
+    pub fn to_instruments(&self) -> Result<Vec<Instrument>, String> {
+        if self.presets.is_empty() {
+            return Err("The preset bank must contain at least one preset".into());
+        }
+
+        self.presets
+            .iter()
+            .enumerate()
+            .map(|(index, preset)| preset.to_instrument(index))
+            .collect()
+    }
+}
+
+impl Preset {
+    fn to_instrument(&self, index: usize) -> Result<Instrument, String> {
+        let context = || format!("Preset {} ({})", index + 1, self.name);
+        if self.name.trim().is_empty() {
+            return Err(format!("Preset {} has an empty name", index + 1));
+        }
+        if self.oscillators.is_empty() {
+            return Err(format!("{} needs at least one oscillator", context()));
+        }
+        if self
+            .oscillators
+            .iter()
+            .any(|oscillator| !oscillator.gain.is_finite() || oscillator.gain < 0.0)
+        {
+            return Err(format!("{} has an invalid oscillator gain", context()));
+        }
+
+        validate_non_negative(self.envelope.attack_seconds, "attack", &context())?;
+        validate_non_negative(self.envelope.decay_seconds, "decay", &context())?;
+        validate_range(self.envelope.sustain_level, 0.0, 1.0, "sustain", &context())?;
+        validate_non_negative(self.envelope.release_seconds, "release", &context())?;
+
+        let oscillators = self
+            .oscillators
+            .iter()
+            .map(|oscillator| {
+                OscillatorAssignment::new(oscillator.waveform.into_domain(), oscillator.gain)
+            })
+            .collect();
+        let mut instrument =
+            Instrument::new(self.name.clone(), oscillators).with_envelope(EnvelopeSettings::new(
+                self.envelope.attack_seconds,
+                self.envelope.decay_seconds,
+                self.envelope.sustain_level,
+                self.envelope.release_seconds,
+            ));
+
+        if let Some(filter) = &self.filter {
+            validate_positive(filter.cutoff_hz, "filter cutoff", &context())?;
+            validate_range(filter.resonance_q, 0.5, 20.0, "filter Q", &context())?;
+            instrument = instrument.with_filter(FilterSettings::new(
+                filter.mode.into_domain(),
+                filter.cutoff_hz,
+                filter.resonance_q,
+            ));
+        }
+        if let Some(vibrato) = &self.vibrato {
+            validate_non_negative(vibrato.rate_hz, "vibrato rate", &context())?;
+            validate_non_negative(vibrato.depth_cents, "vibrato depth", &context())?;
+            instrument =
+                instrument.with_vibrato(Vibrato::new(vibrato.rate_hz, vibrato.depth_cents));
+        }
+        if let Some(tremolo) = &self.tremolo {
+            validate_non_negative(tremolo.rate_hz, "tremolo rate", &context())?;
+            validate_range(tremolo.depth, 0.0, 1.0, "tremolo depth", &context())?;
+            instrument = instrument.with_tremolo(Tremolo::new(tremolo.rate_hz, tremolo.depth));
+        }
+
+        Ok(instrument)
+    }
+}
+
+fn validate_non_negative(value: f32, field: &str, context: &str) -> Result<(), String> {
+    validate_range(value, 0.0, f32::MAX, field, context)
+}
+
+fn validate_positive(value: f32, field: &str, context: &str) -> Result<(), String> {
+    if value.is_finite() && value > 0.0 {
+        Ok(())
+    } else {
+        Err(format!("{context} has an invalid {field}"))
+    }
+}
+
+fn validate_range(
+    value: f32,
+    minimum: f32,
+    maximum: f32,
+    field: &str,
+    context: &str,
+) -> Result<(), String> {
+    if value.is_finite() && (minimum..=maximum).contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} has an invalid {field}; expected {minimum}..={maximum}"
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const XML: &str = r#"
+        <presets>
+          <preset name="Warm">
+            <oscillator waveform="triangle" gain="0.7"/>
+            <oscillator waveform="sine" gain="0.3"/>
+            <filter mode="lowpass" cutoff_hz="2500" resonance_q="0.707"/>
+            <vibrato rate_hz="5" depth_cents="12"/>
+            <tremolo rate_hz="4" depth="0.2"/>
+            <envelope attack_seconds="0.1" decay_seconds="0.2" sustain_level="0.7" release_seconds="0.5"/>
+          </preset>
+        </presets>
+    "#;
+
+    #[test]
+    fn loads_and_converts_xml_presets() {
+        let bank = PresetBank::from_xml(XML).unwrap();
+        let instruments = bank.to_instruments().unwrap();
+
+        assert_eq!(instruments[0].name(), "Warm");
+        assert_eq!(instruments[0].oscillators().len(), 2);
+        assert!(instruments[0].filter().is_some());
+        assert!(instruments[0].vibrato().is_some());
+        assert!(instruments[0].tremolo().is_some());
+    }
+
+    #[test]
+    fn round_trips_xml_presets() {
+        let bank = PresetBank::from_xml(XML).unwrap();
+        let serialized = bank.to_xml().unwrap();
+        let restored = PresetBank::from_xml(&serialized).unwrap();
+
+        assert_eq!(restored, bank);
+    }
+
+    #[test]
+    fn loads_the_bundled_preset_bank() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("presets.xml");
+        let bank = PresetBank::load(&path).unwrap();
+
+        assert_eq!(bank.presets.len(), 5);
+        assert_eq!(bank.presets[4].name, "Warm");
+    }
+}

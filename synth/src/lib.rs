@@ -7,7 +7,7 @@ pub mod synthesizer;
 pub mod voice;
 pub mod voice_manager;
 
-pub use envelope::Adsr;
+pub use envelope::{Adsr, EnvelopeSettings};
 pub use filter::{FilterMode, FilterSettings, StateVariableFilter};
 pub use instrument::{Instrument, OscillatorAssignment, Tremolo, Vibrato};
 pub use lfo::{Lfo, LfoWaveform};
