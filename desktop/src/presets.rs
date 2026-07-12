@@ -2,8 +2,8 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 use synth::{
-    EnvelopeSettings, FilterMode, FilterSettings, Instrument, OscillatorAssignment, Tremolo,
-    Vibrato, Waveform,
+    Chorus, EnvelopeSettings, FilterMode, FilterSettings, Flanger, Instrument,
+    OscillatorAssignment, Reverb, Tremolo, Vibrato, Waveform,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -25,6 +25,12 @@ pub struct Preset {
     pub vibrato: Option<VibratoPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tremolo: Option<TremoloPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chorus: Option<ChorusPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flanger: Option<FlangerPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reverb: Option<ReverbPreset>,
     #[serde(default)]
     pub envelope: EnvelopePreset,
 }
@@ -120,6 +126,42 @@ pub struct TremoloPreset {
     pub rate_hz: f32,
     #[serde(rename = "@depth")]
     pub depth: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChorusPreset {
+    #[serde(rename = "@rate_hz")]
+    pub rate_hz: f32,
+    #[serde(rename = "@base_delay_ms")]
+    pub base_delay_ms: f32,
+    #[serde(rename = "@depth_ms")]
+    pub depth_ms: f32,
+    #[serde(rename = "@mix")]
+    pub mix: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FlangerPreset {
+    #[serde(rename = "@rate_hz")]
+    pub rate_hz: f32,
+    #[serde(rename = "@base_delay_ms")]
+    pub base_delay_ms: f32,
+    #[serde(rename = "@depth_ms")]
+    pub depth_ms: f32,
+    #[serde(rename = "@feedback")]
+    pub feedback: f32,
+    #[serde(rename = "@mix")]
+    pub mix: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReverbPreset {
+    #[serde(rename = "@room_size")]
+    pub room_size: f32,
+    #[serde(rename = "@damping")]
+    pub damping: f32,
+    #[serde(rename = "@mix")]
+    pub mix: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -243,6 +285,45 @@ impl Preset {
             validate_range(tremolo.depth, 0.0, 1.0, "tremolo depth", &context())?;
             instrument = instrument.with_tremolo(Tremolo::new(tremolo.rate_hz, tremolo.depth));
         }
+        if let Some(chorus) = &self.chorus {
+            validate_non_negative(chorus.rate_hz, "chorus rate", &context())?;
+            validate_positive(chorus.base_delay_ms, "chorus base delay", &context())?;
+            validate_non_negative(chorus.depth_ms, "chorus depth", &context())?;
+            validate_range(chorus.mix, 0.0, 1.0, "chorus mix", &context())?;
+            instrument = instrument.with_chorus(Chorus::new(
+                chorus.rate_hz,
+                chorus.base_delay_ms,
+                chorus.depth_ms,
+                chorus.mix,
+            ));
+        }
+        if let Some(flanger) = &self.flanger {
+            validate_non_negative(flanger.rate_hz, "flanger rate", &context())?;
+            validate_positive(flanger.base_delay_ms, "flanger base delay", &context())?;
+            validate_non_negative(flanger.depth_ms, "flanger depth", &context())?;
+            validate_range(
+                flanger.feedback,
+                -0.95,
+                0.95,
+                "flanger feedback",
+                &context(),
+            )?;
+            validate_range(flanger.mix, 0.0, 1.0, "flanger mix", &context())?;
+            instrument = instrument.with_flanger(Flanger::new(
+                flanger.rate_hz,
+                flanger.base_delay_ms,
+                flanger.depth_ms,
+                flanger.feedback,
+                flanger.mix,
+            ));
+        }
+        if let Some(reverb) = &self.reverb {
+            validate_range(reverb.room_size, 0.0, 1.0, "reverb room size", &context())?;
+            validate_range(reverb.damping, 0.0, 1.0, "reverb damping", &context())?;
+            validate_range(reverb.mix, 0.0, 1.0, "reverb mix", &context())?;
+            instrument =
+                instrument.with_reverb(Reverb::new(reverb.room_size, reverb.damping, reverb.mix));
+        }
 
         Ok(instrument)
     }
@@ -288,6 +369,9 @@ mod tests {
             <filter mode="lowpass" cutoff_hz="2500" resonance_q="0.707"/>
             <vibrato rate_hz="5" depth_cents="12"/>
             <tremolo rate_hz="4" depth="0.2"/>
+            <chorus rate_hz="0.6" base_delay_ms="20" depth_ms="5" mix="0.3"/>
+            <flanger rate_hz="0.2" base_delay_ms="1" depth_ms="2" feedback="0.5" mix="0.25"/>
+            <reverb room_size="0.65" damping="0.4" mix="0.2"/>
             <envelope attack_seconds="0.1" decay_seconds="0.2" sustain_level="0.7" release_seconds="0.5"/>
           </preset>
         </presets>
@@ -303,6 +387,9 @@ mod tests {
         assert!(instruments[0].filter().is_some());
         assert!(instruments[0].vibrato().is_some());
         assert!(instruments[0].tremolo().is_some());
+        assert!(instruments[0].chorus().is_some());
+        assert!(instruments[0].flanger().is_some());
+        assert!(instruments[0].reverb().is_some());
     }
 
     #[test]

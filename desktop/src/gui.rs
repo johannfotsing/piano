@@ -6,8 +6,8 @@ use music::{event::NoteEvent, note::Note};
 use crate::{
     audio::AudioCommand,
     presets::{
-        EnvelopePreset, FilterModePreset, FilterPreset, OscillatorPreset, PresetBank,
-        TremoloPreset, VibratoPreset, WaveformPreset,
+        ChorusPreset, EnvelopePreset, FilterModePreset, FilterPreset, FlangerPreset,
+        OscillatorPreset, PresetBank, ReverbPreset, TremoloPreset, VibratoPreset, WaveformPreset,
     },
 };
 
@@ -257,14 +257,119 @@ impl PresetEditor {
         });
     }
 
+    fn show_chorus(ui: &mut egui::Ui, chorus: &mut Option<ChorusPreset>) {
+        let mut enabled = chorus.is_some();
+        ui.horizontal(|ui| {
+            ui.strong("Chorus:");
+            if ui.checkbox(&mut enabled, "Enabled").changed() {
+                *chorus = enabled.then_some(ChorusPreset {
+                    rate_hz: 0.6,
+                    base_delay_ms: 20.0,
+                    depth_ms: 5.0,
+                    mix: 0.3,
+                });
+            }
+            if let Some(chorus) = chorus {
+                ui.label("Rate Hz");
+                ui.add(egui::DragValue::new(&mut chorus.rate_hz).range(0.0..=20.0));
+                ui.label("Base delay ms");
+                ui.add(egui::DragValue::new(&mut chorus.base_delay_ms).range(0.1..=100.0));
+                ui.label("Depth ms");
+                ui.add(egui::DragValue::new(&mut chorus.depth_ms).range(0.0..=50.0));
+                ui.label("Mix");
+                ui.add(
+                    egui::DragValue::new(&mut chorus.mix)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+            }
+        });
+    }
+
+    fn show_flanger(ui: &mut egui::Ui, flanger: &mut Option<FlangerPreset>) {
+        let mut enabled = flanger.is_some();
+        ui.horizontal(|ui| {
+            ui.strong("Flanger:");
+            if ui.checkbox(&mut enabled, "Enabled").changed() {
+                *flanger = enabled.then_some(FlangerPreset {
+                    rate_hz: 0.2,
+                    base_delay_ms: 1.0,
+                    depth_ms: 2.0,
+                    feedback: 0.5,
+                    mix: 0.25,
+                });
+            }
+            if let Some(flanger) = flanger {
+                ui.label("Rate Hz");
+                ui.add(egui::DragValue::new(&mut flanger.rate_hz).range(0.0..=20.0));
+                ui.label("Base delay ms");
+                ui.add(egui::DragValue::new(&mut flanger.base_delay_ms).range(0.1..=20.0));
+                ui.label("Depth ms");
+                ui.add(egui::DragValue::new(&mut flanger.depth_ms).range(0.0..=20.0));
+                ui.label("Feedback");
+                ui.add(
+                    egui::DragValue::new(&mut flanger.feedback)
+                        .range(-0.95..=0.95)
+                        .speed(0.01),
+                );
+                ui.label("Mix");
+                ui.add(
+                    egui::DragValue::new(&mut flanger.mix)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+            }
+        });
+    }
+
+    fn show_reverb(ui: &mut egui::Ui, reverb: &mut Option<ReverbPreset>) {
+        let mut enabled = reverb.is_some();
+        ui.horizontal(|ui| {
+            ui.strong("Reverb:");
+            if ui.checkbox(&mut enabled, "Enabled").changed() {
+                *reverb = enabled.then_some(ReverbPreset {
+                    room_size: 0.65,
+                    damping: 0.4,
+                    mix: 0.2,
+                });
+            }
+            if let Some(reverb) = reverb {
+                ui.label("Room size");
+                ui.add(
+                    egui::DragValue::new(&mut reverb.room_size)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+                ui.label("Damping");
+                ui.add(
+                    egui::DragValue::new(&mut reverb.damping)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+                ui.label("Mix");
+                ui.add(
+                    egui::DragValue::new(&mut reverb.mix)
+                        .range(0.0..=1.0)
+                        .speed(0.01),
+                );
+            }
+        });
+    }
+
     fn show_effects(
         ui: &mut egui::Ui,
         vibrato: &mut Option<VibratoPreset>,
         tremolo: &mut Option<TremoloPreset>,
+        chorus: &mut Option<ChorusPreset>,
+        flanger: &mut Option<FlangerPreset>,
+        reverb: &mut Option<ReverbPreset>,
     ) {
         ui.heading("Effects");
         Self::show_vibrato(ui, vibrato);
         Self::show_tremolo(ui, tremolo);
+        Self::show_chorus(ui, chorus);
+        Self::show_flanger(ui, flanger);
+        Self::show_reverb(ui, reverb);
     }
 
     fn show_envelope(ui: &mut egui::Ui, envelope: &mut EnvelopePreset) {
@@ -337,7 +442,14 @@ impl eframe::App for PresetEditor {
 
                             Self::show_oscillators(ui, preset);
                             ui.separator();
-                            Self::show_effects(ui, &mut preset.vibrato, &mut preset.tremolo);
+                            Self::show_effects(
+                                ui,
+                                &mut preset.vibrato,
+                                &mut preset.tremolo,
+                                &mut preset.chorus,
+                                &mut preset.flanger,
+                                &mut preset.reverb,
+                            );
                             ui.separator();
                             Self::show_filter(ui, &mut preset.filter);
                             ui.separator();

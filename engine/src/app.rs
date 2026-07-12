@@ -45,8 +45,9 @@ mod tests {
 }
 
 impl App {
-    pub fn new(synthesizer: Synthesizer, instruments: Vec<Instrument>) -> Self {
+    pub fn new(mut synthesizer: Synthesizer, instruments: Vec<Instrument>) -> Self {
         assert!(!instruments.is_empty());
+        synthesizer.configure_effects(&instruments[0]);
 
         Self {
             synthesizer,
@@ -99,6 +100,7 @@ impl App {
             return false;
         }
 
+        self.synthesizer.configure_effects(&self.instruments[index]);
         self.selected_instrument = index;
         true
     }
@@ -110,6 +112,8 @@ impl App {
 
         self.instruments = instruments;
         self.selected_instrument = self.selected_instrument.min(self.instruments.len() - 1);
+        self.synthesizer
+            .configure_effects(&self.instruments[self.selected_instrument]);
         true
     }
 }

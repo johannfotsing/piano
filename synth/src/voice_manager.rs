@@ -40,10 +40,7 @@ impl VoiceManager {
         self.cleanup();
 
         // Fixed gain keeps existing notes at the same level when polyphony changes.
-        let gained_sample = mixed_sample * self.master_gain;
-
-        // Smoothly constrain peaks to [-1.0, 1.0].
-        gained_sample.tanh()
+        mixed_sample * self.master_gain
     }
 
     fn cleanup(&mut self) {
@@ -53,10 +50,4 @@ impl VoiceManager {
     pub fn set_master_gain(&mut self, gain: f32) {
         self.master_gain = gain.clamp(0.0, 1.0);
     }
-}
-
-// TODO: Use soft clipping instead of tanh for better performance and less CPU usage.
-/// Soft clipping function to prevent harsh distortion.
-fn soft_clip(sample: f32) -> f32 {
-    sample / (1.0 + sample.abs())
 }

@@ -1,3 +1,4 @@
+pub mod effects;
 pub mod envelope;
 pub mod filter;
 pub mod instrument;
@@ -7,9 +8,10 @@ pub mod synthesizer;
 pub mod voice;
 pub mod voice_manager;
 
+pub use effects::{ChorusProcessor, FlangerProcessor, ReverbProcessor};
 pub use envelope::{Adsr, EnvelopeSettings};
 pub use filter::{FilterMode, FilterSettings, StateVariableFilter};
-pub use instrument::{Instrument, OscillatorAssignment, Tremolo, Vibrato};
+pub use instrument::{Chorus, Flanger, Instrument, OscillatorAssignment, Reverb, Tremolo, Vibrato};
 pub use lfo::{Lfo, LfoWaveform};
 pub use oscillator::{Oscillator, Waveform};
 pub use synthesizer::Synthesizer;

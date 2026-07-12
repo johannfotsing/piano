@@ -57,6 +57,114 @@ impl Tremolo {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Chorus {
+    rate_hz: f32,
+    base_delay_ms: f32,
+    depth_ms: f32,
+    mix: f32,
+}
+
+impl Chorus {
+    pub fn new(rate_hz: f32, base_delay_ms: f32, depth_ms: f32, mix: f32) -> Self {
+        assert!(rate_hz.is_finite() && rate_hz >= 0.0);
+        assert!(base_delay_ms.is_finite() && base_delay_ms > 0.0);
+        assert!(depth_ms.is_finite() && depth_ms >= 0.0);
+        assert!(mix.is_finite() && (0.0..=1.0).contains(&mix));
+        Self {
+            rate_hz,
+            base_delay_ms,
+            depth_ms,
+            mix,
+        }
+    }
+
+    pub const fn rate_hz(&self) -> f32 {
+        self.rate_hz
+    }
+    pub const fn base_delay_ms(&self) -> f32 {
+        self.base_delay_ms
+    }
+    pub const fn depth_ms(&self) -> f32 {
+        self.depth_ms
+    }
+    pub const fn mix(&self) -> f32 {
+        self.mix
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Flanger {
+    rate_hz: f32,
+    base_delay_ms: f32,
+    depth_ms: f32,
+    feedback: f32,
+    mix: f32,
+}
+
+impl Flanger {
+    pub fn new(rate_hz: f32, base_delay_ms: f32, depth_ms: f32, feedback: f32, mix: f32) -> Self {
+        assert!(rate_hz.is_finite() && rate_hz >= 0.0);
+        assert!(base_delay_ms.is_finite() && base_delay_ms > 0.0);
+        assert!(depth_ms.is_finite() && depth_ms >= 0.0);
+        assert!(feedback.is_finite() && (-0.95..=0.95).contains(&feedback));
+        assert!(mix.is_finite() && (0.0..=1.0).contains(&mix));
+        Self {
+            rate_hz,
+            base_delay_ms,
+            depth_ms,
+            feedback,
+            mix,
+        }
+    }
+
+    pub const fn rate_hz(&self) -> f32 {
+        self.rate_hz
+    }
+    pub const fn base_delay_ms(&self) -> f32 {
+        self.base_delay_ms
+    }
+    pub const fn depth_ms(&self) -> f32 {
+        self.depth_ms
+    }
+    pub const fn feedback(&self) -> f32 {
+        self.feedback
+    }
+    pub const fn mix(&self) -> f32 {
+        self.mix
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Reverb {
+    room_size: f32,
+    damping: f32,
+    mix: f32,
+}
+
+impl Reverb {
+    pub fn new(room_size: f32, damping: f32, mix: f32) -> Self {
+        assert!(room_size.is_finite() && (0.0..=1.0).contains(&room_size));
+        assert!(damping.is_finite() && (0.0..=1.0).contains(&damping));
+        assert!(mix.is_finite() && (0.0..=1.0).contains(&mix));
+        Self {
+            room_size,
+            damping,
+            mix,
+        }
+    }
+
+    pub const fn room_size(&self) -> f32 {
+        self.room_size
+    }
+    pub const fn damping(&self) -> f32 {
+        self.damping
+    }
+    pub const fn mix(&self) -> f32 {
+        self.mix
+    }
+}
+
 impl OscillatorAssignment {
     pub fn new(waveform: Waveform, gain: f32) -> Self {
         assert!(gain.is_finite() && gain >= 0.0);
@@ -79,6 +187,9 @@ pub struct Instrument {
     oscillators: Vec<OscillatorAssignment>,
     vibrato: Option<Vibrato>,
     tremolo: Option<Tremolo>,
+    chorus: Option<Chorus>,
+    flanger: Option<Flanger>,
+    reverb: Option<Reverb>,
     filter: Option<FilterSettings>,
     envelope: EnvelopeSettings,
 }
@@ -91,6 +202,9 @@ impl Instrument {
             oscillators,
             vibrato: None,
             tremolo: None,
+            chorus: None,
+            flanger: None,
+            reverb: None,
             filter: None,
             envelope: EnvelopeSettings::default(),
         }
@@ -120,6 +234,33 @@ impl Instrument {
 
     pub const fn tremolo(&self) -> Option<Tremolo> {
         self.tremolo
+    }
+
+    pub fn with_chorus(mut self, chorus: Chorus) -> Self {
+        self.chorus = Some(chorus);
+        self
+    }
+
+    pub const fn chorus(&self) -> Option<Chorus> {
+        self.chorus
+    }
+
+    pub fn with_flanger(mut self, flanger: Flanger) -> Self {
+        self.flanger = Some(flanger);
+        self
+    }
+
+    pub const fn flanger(&self) -> Option<Flanger> {
+        self.flanger
+    }
+
+    pub fn with_reverb(mut self, reverb: Reverb) -> Self {
+        self.reverb = Some(reverb);
+        self
+    }
+
+    pub const fn reverb(&self) -> Option<Reverb> {
+        self.reverb
     }
 
     pub fn with_filter(mut self, filter: FilterSettings) -> Self {
@@ -167,5 +308,18 @@ mod tests {
         let filter = instrument.filter().unwrap();
         assert_eq!(filter.mode(), crate::FilterMode::LowPass);
         assert_eq!(filter.cutoff_hz(), 2_500.0);
+    }
+
+    #[test]
+    fn adds_time_based_effects_to_an_instrument() {
+        let instrument =
+            Instrument::new("Test", vec![OscillatorAssignment::new(Waveform::Sine, 1.0)])
+                .with_chorus(Chorus::new(0.6, 20.0, 5.0, 0.3))
+                .with_flanger(Flanger::new(0.2, 1.0, 2.0, 0.5, 0.25))
+                .with_reverb(Reverb::new(0.65, 0.4, 0.2));
+
+        assert!(instrument.chorus().is_some());
+        assert!(instrument.flanger().is_some());
+        assert!(instrument.reverb().is_some());
     }
 }
