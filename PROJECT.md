@@ -220,7 +220,7 @@ Add:
 - [x] square wave
 - [x] triangle
 - [x] saw wave
-- [ ] filters
+- [x] filters
 - [x] LFO
 - [x] vibrato
 - [x] tremolo

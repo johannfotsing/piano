@@ -1,4 +1,4 @@
-use crate::{Adsr, Instrument, Lfo, LfoWaveform, Oscillator};
+use crate::{Adsr, Instrument, Lfo, LfoWaveform, Oscillator, StateVariableFilter};
 use music::note::Note;
 
 struct VoiceOscillator {
@@ -18,6 +18,7 @@ struct VoiceTremolo {
 
 pub struct Voice {
     oscillators: Vec<VoiceOscillator>,
+    filter: Option<StateVariableFilter>,
     envelope: Adsr,
     vibrato: Option<VoiceVibrato>,
     tremolo: Option<VoiceTremolo>,
@@ -60,9 +61,13 @@ impl Voice {
             lfo: Lfo::new(tremolo.rate_hz(), sample_rate, LfoWaveform::Sine),
             depth: tremolo.depth(),
         });
+        let filter = instrument
+            .filter()
+            .map(|settings| StateVariableFilter::new(settings, sample_rate));
 
         Self {
             oscillators,
+            filter,
             envelope,
             vibrato,
             tremolo,
@@ -93,8 +98,12 @@ impl Voice {
             .iter_mut()
             .map(|oscillator| oscillator.oscillator.next_sample() * oscillator.gain)
             .sum::<f32>();
+        let filtered_sample = self
+            .filter
+            .as_mut()
+            .map_or(oscillator_mix, |filter| filter.process(oscillator_mix));
 
-        oscillator_mix * amplitude
+        filtered_sample * amplitude
     }
 
     pub fn note_off(&mut self) {

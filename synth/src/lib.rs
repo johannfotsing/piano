@@ -1,4 +1,5 @@
 pub mod envelope;
+pub mod filter;
 pub mod instrument;
 pub mod lfo;
 pub mod oscillator;
@@ -7,6 +8,7 @@ pub mod voice;
 pub mod voice_manager;
 
 pub use envelope::Adsr;
+pub use filter::{FilterMode, FilterSettings, StateVariableFilter};
 pub use instrument::{Instrument, OscillatorAssignment, Tremolo, Vibrato};
 pub use lfo::{Lfo, LfoWaveform};
 pub use oscillator::{Oscillator, Waveform};
