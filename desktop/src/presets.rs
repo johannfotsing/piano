@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 use synth::{
-    Chorus, EnvelopeSettings, FilterMode, FilterSettings, Flanger, Instrument,
+    Chorus, EnvelopeSettings, FilterMode, FilterSettings, Flanger, Hammer, Instrument,
     OscillatorAssignment, Reverb, Tremolo, Vibrato, Waveform,
 };
 
@@ -19,6 +19,8 @@ pub struct Preset {
     pub name: String,
     #[serde(rename = "oscillator", default)]
     pub oscillators: Vec<OscillatorPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hammer: Option<HammerPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<FilterPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -41,6 +43,33 @@ pub struct OscillatorPreset {
     pub waveform: WaveformPreset,
     #[serde(rename = "@gain")]
     pub gain: f32,
+    #[serde(rename = "@frequency_ratio", default = "default_frequency_ratio")]
+    pub frequency_ratio: f32,
+    #[serde(rename = "@detune_cents", default)]
+    pub detune_cents: f32,
+    #[serde(rename = "@decay_seconds", default = "default_partial_decay")]
+    pub decay_seconds: f32,
+    #[serde(rename = "@velocity_sensitivity", default)]
+    pub velocity_sensitivity: f32,
+}
+
+fn default_frequency_ratio() -> f32 {
+    1.0
+}
+fn default_partial_decay() -> f32 {
+    60.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HammerPreset {
+    #[serde(rename = "@gain")]
+    pub gain: f32,
+    #[serde(rename = "@decay_seconds")]
+    pub decay_seconds: f32,
+    #[serde(rename = "@cutoff_hz")]
+    pub cutoff_hz: f32,
+    #[serde(rename = "@velocity_sensitivity")]
+    pub velocity_sensitivity: f32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -237,11 +266,17 @@ impl Preset {
         if self.oscillators.is_empty() {
             return Err(format!("{} needs at least one oscillator", context()));
         }
-        if self
-            .oscillators
-            .iter()
-            .any(|oscillator| !oscillator.gain.is_finite() || oscillator.gain < 0.0)
-        {
+        if self.oscillators.iter().any(|oscillator| {
+            !oscillator.gain.is_finite()
+                || oscillator.gain < 0.0
+                || !oscillator.frequency_ratio.is_finite()
+                || oscillator.frequency_ratio <= 0.0
+                || !oscillator.detune_cents.is_finite()
+                || !oscillator.decay_seconds.is_finite()
+                || oscillator.decay_seconds <= 0.0
+                || !oscillator.velocity_sensitivity.is_finite()
+                || oscillator.velocity_sensitivity < 0.0
+        }) {
             return Err(format!("{} has an invalid oscillator gain", context()));
         }
 
@@ -255,6 +290,12 @@ impl Preset {
             .iter()
             .map(|oscillator| {
                 OscillatorAssignment::new(oscillator.waveform.into_domain(), oscillator.gain)
+                    .with_partial(
+                        oscillator.frequency_ratio,
+                        oscillator.detune_cents,
+                        oscillator.decay_seconds,
+                        oscillator.velocity_sensitivity,
+                    )
             })
             .collect();
         let mut instrument =
@@ -264,6 +305,23 @@ impl Preset {
                 self.envelope.sustain_level,
                 self.envelope.release_seconds,
             ));
+
+        if let Some(hammer) = &self.hammer {
+            validate_non_negative(hammer.gain, "hammer gain", &context())?;
+            validate_positive(hammer.decay_seconds, "hammer decay", &context())?;
+            validate_positive(hammer.cutoff_hz, "hammer cutoff", &context())?;
+            validate_non_negative(
+                hammer.velocity_sensitivity,
+                "hammer velocity sensitivity",
+                &context(),
+            )?;
+            instrument = instrument.with_hammer(Hammer::new(
+                hammer.gain,
+                hammer.decay_seconds,
+                hammer.cutoff_hz,
+                hammer.velocity_sensitivity,
+            ));
+        }
 
         if let Some(filter) = &self.filter {
             validate_positive(filter.cutoff_hz, "filter cutoff", &context())?;
@@ -364,8 +422,9 @@ mod tests {
     const XML: &str = r#"
         <presets>
           <preset name="Warm">
-            <oscillator waveform="triangle" gain="0.7"/>
+            <oscillator waveform="triangle" gain="0.7" frequency_ratio="2.01" detune_cents="1.5" decay_seconds="1.2" velocity_sensitivity="0.8"/>
             <oscillator waveform="sine" gain="0.3"/>
+            <hammer gain="0.06" decay_seconds="0.018" cutoff_hz="6000" velocity_sensitivity="1.5"/>
             <filter mode="lowpass" cutoff_hz="2500" resonance_q="0.707"/>
             <vibrato rate_hz="5" depth_cents="12"/>
             <tremolo rate_hz="4" depth="0.2"/>
@@ -384,6 +443,8 @@ mod tests {
 
         assert_eq!(instruments[0].name(), "Warm");
         assert_eq!(instruments[0].oscillators().len(), 2);
+        assert_eq!(instruments[0].oscillators()[0].frequency_ratio(), 2.01);
+        assert!(instruments[0].hammer().is_some());
         assert!(instruments[0].filter().is_some());
         assert!(instruments[0].vibrato().is_some());
         assert!(instruments[0].tremolo().is_some());

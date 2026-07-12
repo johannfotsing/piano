@@ -6,7 +6,7 @@ use music::{event::NoteEvent, note::Note};
 use crate::{
     audio::AudioCommand,
     presets::{
-        ChorusPreset, EnvelopePreset, FilterModePreset, FilterPreset, FlangerPreset,
+        ChorusPreset, EnvelopePreset, FilterModePreset, FilterPreset, FlangerPreset, HammerPreset,
         OscillatorPreset, PresetBank, ReverbPreset, TremoloPreset, VibratoPreset, WaveformPreset,
     },
 };
@@ -167,6 +167,30 @@ impl PresetEditor {
                         .range(0.0..=2.0)
                         .speed(0.01),
                 );
+                ui.label("Ratio");
+                ui.add(
+                    egui::DragValue::new(&mut oscillator.frequency_ratio)
+                        .range(0.01..=16.0)
+                        .speed(0.01),
+                );
+                ui.label("Detune cents");
+                ui.add(
+                    egui::DragValue::new(&mut oscillator.detune_cents)
+                        .range(-100.0..=100.0)
+                        .speed(0.1),
+                );
+                ui.label("Decay s");
+                ui.add(
+                    egui::DragValue::new(&mut oscillator.decay_seconds)
+                        .range(0.01..=60.0)
+                        .speed(0.05),
+                );
+                ui.label("Velocity");
+                ui.add(
+                    egui::DragValue::new(&mut oscillator.velocity_sensitivity)
+                        .range(0.0..=4.0)
+                        .speed(0.05),
+                );
                 if ui.button("Remove").clicked() {
                     remove = Some(index);
                 }
@@ -179,8 +203,43 @@ impl PresetEditor {
             preset.oscillators.push(OscillatorPreset {
                 waveform: WaveformPreset::Sine,
                 gain: 0.5,
+                frequency_ratio: 1.0,
+                detune_cents: 0.0,
+                decay_seconds: 60.0,
+                velocity_sensitivity: 0.0,
             });
         }
+
+        let mut enabled = preset.hammer.is_some();
+        ui.horizontal(|ui| {
+            ui.strong("Hammer:");
+            if ui.checkbox(&mut enabled, "Enabled").changed() {
+                preset.hammer = enabled.then_some(HammerPreset {
+                    gain: 0.08,
+                    decay_seconds: 0.015,
+                    cutoff_hz: 5_000.0,
+                    velocity_sensitivity: 1.5,
+                });
+            }
+            if let Some(hammer) = &mut preset.hammer {
+                ui.label("Gain");
+                ui.add(egui::DragValue::new(&mut hammer.gain).range(0.0..=1.0));
+                ui.label("Decay s");
+                ui.add(
+                    egui::DragValue::new(&mut hammer.decay_seconds)
+                        .range(0.001..=0.2)
+                        .speed(0.001),
+                );
+                ui.label("Cutoff Hz");
+                ui.add(egui::DragValue::new(&mut hammer.cutoff_hz).range(100.0..=20_000.0));
+                ui.label("Velocity");
+                ui.add(
+                    egui::DragValue::new(&mut hammer.velocity_sensitivity)
+                        .range(0.0..=4.0)
+                        .speed(0.05),
+                );
+            }
+        });
     }
 
     fn show_filter(ui: &mut egui::Ui, filter: &mut Option<FilterPreset>) {

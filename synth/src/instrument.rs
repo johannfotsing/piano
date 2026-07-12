@@ -5,6 +5,46 @@ use crate::{EnvelopeSettings, FilterSettings, Waveform};
 pub struct OscillatorAssignment {
     waveform: Waveform,
     gain: f32,
+    frequency_ratio: f32,
+    detune_cents: f32,
+    decay_seconds: f32,
+    velocity_sensitivity: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Hammer {
+    gain: f32,
+    decay_seconds: f32,
+    cutoff_hz: f32,
+    velocity_sensitivity: f32,
+}
+
+impl Hammer {
+    pub fn new(gain: f32, decay_seconds: f32, cutoff_hz: f32, velocity_sensitivity: f32) -> Self {
+        assert!(gain.is_finite() && gain >= 0.0);
+        assert!(decay_seconds.is_finite() && decay_seconds > 0.0);
+        assert!(cutoff_hz.is_finite() && cutoff_hz > 0.0);
+        assert!(velocity_sensitivity.is_finite() && velocity_sensitivity >= 0.0);
+        Self {
+            gain,
+            decay_seconds,
+            cutoff_hz,
+            velocity_sensitivity,
+        }
+    }
+
+    pub const fn gain(&self) -> f32 {
+        self.gain
+    }
+    pub const fn decay_seconds(&self) -> f32 {
+        self.decay_seconds
+    }
+    pub const fn cutoff_hz(&self) -> f32 {
+        self.cutoff_hz
+    }
+    pub const fn velocity_sensitivity(&self) -> f32 {
+        self.velocity_sensitivity
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -168,7 +208,32 @@ impl Reverb {
 impl OscillatorAssignment {
     pub fn new(waveform: Waveform, gain: f32) -> Self {
         assert!(gain.is_finite() && gain >= 0.0);
-        Self { waveform, gain }
+        Self {
+            waveform,
+            gain,
+            frequency_ratio: 1.0,
+            detune_cents: 0.0,
+            decay_seconds: 60.0,
+            velocity_sensitivity: 0.0,
+        }
+    }
+
+    pub fn with_partial(
+        mut self,
+        frequency_ratio: f32,
+        detune_cents: f32,
+        decay_seconds: f32,
+        velocity_sensitivity: f32,
+    ) -> Self {
+        assert!(frequency_ratio.is_finite() && frequency_ratio > 0.0);
+        assert!(detune_cents.is_finite());
+        assert!(decay_seconds.is_finite() && decay_seconds > 0.0);
+        assert!(velocity_sensitivity.is_finite() && velocity_sensitivity >= 0.0);
+        self.frequency_ratio = frequency_ratio;
+        self.detune_cents = detune_cents;
+        self.decay_seconds = decay_seconds;
+        self.velocity_sensitivity = velocity_sensitivity;
+        self
     }
 
     pub const fn waveform(&self) -> Waveform {
@@ -177,6 +242,19 @@ impl OscillatorAssignment {
 
     pub const fn gain(&self) -> f32 {
         self.gain
+    }
+
+    pub const fn frequency_ratio(&self) -> f32 {
+        self.frequency_ratio
+    }
+    pub const fn detune_cents(&self) -> f32 {
+        self.detune_cents
+    }
+    pub const fn decay_seconds(&self) -> f32 {
+        self.decay_seconds
+    }
+    pub const fn velocity_sensitivity(&self) -> f32 {
+        self.velocity_sensitivity
     }
 }
 
@@ -190,6 +268,7 @@ pub struct Instrument {
     chorus: Option<Chorus>,
     flanger: Option<Flanger>,
     reverb: Option<Reverb>,
+    hammer: Option<Hammer>,
     filter: Option<FilterSettings>,
     envelope: EnvelopeSettings,
 }
@@ -205,6 +284,7 @@ impl Instrument {
             chorus: None,
             flanger: None,
             reverb: None,
+            hammer: None,
             filter: None,
             envelope: EnvelopeSettings::default(),
         }
@@ -261,6 +341,15 @@ impl Instrument {
 
     pub const fn reverb(&self) -> Option<Reverb> {
         self.reverb
+    }
+
+    pub fn with_hammer(mut self, hammer: Hammer) -> Self {
+        self.hammer = Some(hammer);
+        self
+    }
+
+    pub const fn hammer(&self) -> Option<Hammer> {
+        self.hammer
     }
 
     pub fn with_filter(mut self, filter: FilterSettings) -> Self {
@@ -321,5 +410,17 @@ mod tests {
         assert!(instrument.chorus().is_some());
         assert!(instrument.flanger().is_some());
         assert!(instrument.reverb().is_some());
+    }
+
+    #[test]
+    fn configures_a_velocity_sensitive_partial_and_hammer() {
+        let partial =
+            OscillatorAssignment::new(Waveform::Sine, 0.2).with_partial(2.01, 1.5, 1.2, 0.8);
+        let instrument = Instrument::new("Piano", vec![partial])
+            .with_hammer(Hammer::new(0.06, 0.018, 6_000.0, 1.5));
+
+        assert_eq!(instrument.oscillators()[0].frequency_ratio(), 2.01);
+        assert_eq!(instrument.oscillators()[0].decay_seconds(), 1.2);
+        assert_eq!(instrument.hammer().unwrap().cutoff_hz(), 6_000.0);
     }
 }

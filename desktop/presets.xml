@@ -29,10 +29,14 @@
     <envelope attack_seconds="0.02" decay_seconds="0.5" sustain_level="0.7" release_seconds="0.6"/>
   </preset>
   <preset name="Classical Piano">
-    <oscillator waveform="sine" gain="0.78"/>
-    <oscillator waveform="triangle" gain="0.22"/>
-    <filter mode="lowpass" cutoff_hz="1900" resonance_q="0.5"/>
+    <oscillator waveform="sine" gain="0.48" frequency_ratio="1.0" detune_cents="0" decay_seconds="4.0" velocity_sensitivity="0.0"/>
+    <oscillator waveform="sine" gain="0.20" frequency_ratio="2.0" detune_cents="1" decay_seconds="2.4" velocity_sensitivity="0.4"/>
+    <oscillator waveform="sine" gain="0.11" frequency_ratio="3.01" detune_cents="-1" decay_seconds="1.4" velocity_sensitivity="0.8"/>
+    <oscillator waveform="sine" gain="0.065" frequency_ratio="4.03" detune_cents="2" decay_seconds="0.85" velocity_sensitivity="1.2"/>
+    <oscillator waveform="sine" gain="0.035" frequency_ratio="5.07" detune_cents="-2" decay_seconds="0.45" velocity_sensitivity="1.6"/>
+    <hammer gain="0.06" decay_seconds="0.018" cutoff_hz="6000" velocity_sensitivity="1.5"/>
+    <filter mode="lowpass" cutoff_hz="6500" resonance_q="0.55"/>
     <reverb room_size="0.64" damping="0.75" mix="0.16"/>
-    <envelope attack_seconds="0.015" decay_seconds="1.3" sustain_level="0.02" release_seconds="0.9"/>
+    <envelope attack_seconds="0.003" decay_seconds="0" sustain_level="1.0" release_seconds="0.8"/>
   </preset>
 </presets>
