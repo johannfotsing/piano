@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "desktop-input")]
 use midir::{Ignore, MidiInput, MidiInputConnection};
 
-/// Converts a raw MIDI message into an event understood by the piano engine.
+/// Converts a raw MIDI message into an event understood by the OpenRSynth engine.
 ///
 /// MIDI channel information is intentionally ignored for now because the engine
 /// currently treats every input as a single instrument.
@@ -60,7 +60,7 @@ fn read_port_selection(port_count: usize) -> Result<usize, Box<dyn Error>> {
 pub fn connect_input(
     event_sender: Sender<NoteEvent>,
 ) -> Result<Option<MidiInputConnection<()>>, Box<dyn Error>> {
-    let mut midi_input = MidiInput::new("rust-piano-input")?;
+    let mut midi_input = MidiInput::new("openrsynth-input")?;
     midi_input.ignore(Ignore::None);
 
     let ports = midi_input.ports();
@@ -83,7 +83,7 @@ pub fn connect_input(
     let port_name = midi_input.port_name(port)?;
     let connection = midi_input.connect(
         port,
-        "rust-piano-midi-reader",
+        "openrsynth-midi-reader",
         move |_timestamp, message, _| {
             if let Some(event) = parse_message(message) {
                 let _ = event_sender.send(event);

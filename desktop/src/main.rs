@@ -34,7 +34,7 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        "Rust Piano",
+        "OpenRSynth",
         options,
         Box::new(move |_creation_context| {
             Ok(Box::new(PresetEditor::new(

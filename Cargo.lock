@@ -897,20 +897,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 
 [[package]]
-name = "desktop"
-version = "0.1.0"
-dependencies = [
- "cpal",
- "eframe",
- "engine",
- "midi",
- "music",
- "quick-xml 0.41.0",
- "serde",
- "synth",
-]
-
-[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2661,6 +2647,20 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "openrsynth"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "eframe",
+ "engine",
+ "midi",
+ "music",
+ "quick-xml 0.41.0",
+ "serde",
+ "synth",
+]
 
 [[package]]
 name = "orbclient"

@@ -456,7 +456,7 @@ impl eframe::App for PresetEditor {
 
         egui::CentralPanel::default().show(root, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("Rust Piano Preset Editor");
+                ui.heading("OpenRSynth GUI");
                 if ui.button("Reload XML").clicked() {
                     self.reload();
                 }
