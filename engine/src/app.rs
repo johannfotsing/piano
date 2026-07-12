@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use music::event::NoteEvent;
 use synth::{Instrument, Synthesizer};
 
@@ -10,6 +12,7 @@ pub struct App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     use synth::{OscillatorAssignment, Waveform};
 
     fn test_app() -> App {

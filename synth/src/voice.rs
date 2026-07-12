@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::f32::consts::TAU;
 
 use crate::{Adsr, Hammer, Instrument, Lfo, LfoWaveform, Oscillator, StateVariableFilter};
@@ -24,9 +25,9 @@ impl VoiceHammer {
         let cutoff_hz = settings.cutoff_hz().clamp(20.0, sample_rate * 0.45);
         Self {
             noise_state: seed.max(1),
-            level: settings.gain() * velocity.powf(settings.velocity_sensitivity()),
-            decay_multiplier: (-1.0 / (settings.decay_seconds() * sample_rate)).exp(),
-            filter_coefficient: 1.0 - (-TAU * cutoff_hz / sample_rate).exp(),
+            level: settings.gain() * libm::powf(velocity, settings.velocity_sensitivity()),
+            decay_multiplier: libm::expf(-1.0 / (settings.decay_seconds() * sample_rate)),
+            filter_coefficient: 1.0 - libm::expf(-TAU * cutoff_hz / sample_rate),
             filtered_noise: 0.0,
         }
     }
@@ -78,8 +79,8 @@ impl Voice {
             .oscillators()
             .iter()
             .map(|assignment| {
-                let pitch_ratio =
-                    assignment.frequency_ratio() * 2.0_f32.powf(assignment.detune_cents() / 1200.0);
+                let pitch_ratio = assignment.frequency_ratio()
+                    * libm::powf(2.0, assignment.detune_cents() / 1200.0);
                 VoiceOscillator {
                     oscillator: Oscillator::with_waveform(
                         base_frequency * pitch_ratio,
@@ -87,10 +88,10 @@ impl Voice {
                         assignment.waveform(),
                     ),
                     gain: assignment.gain()
-                        * normalized_velocity.powf(assignment.velocity_sensitivity()),
+                        * libm::powf(normalized_velocity, assignment.velocity_sensitivity()),
                     pitch_ratio,
                     decay_level: 1.0,
-                    decay_multiplier: (-1.0 / (assignment.decay_seconds() * sample_rate)).exp(),
+                    decay_multiplier: libm::expf(-1.0 / (assignment.decay_seconds() * sample_rate)),
                 }
             })
             .collect();
@@ -125,14 +126,14 @@ impl Voice {
             hammer,
             note,
             base_frequency,
-            velocity: normalized_velocity.powf(2.0),
+            velocity: libm::powf(normalized_velocity, 2.0),
         }
     }
 
     pub fn next_sample(&mut self) -> f32 {
         if let Some(vibrato) = &mut self.vibrato {
             let cents = vibrato.lfo.next_sample() * vibrato.depth_cents;
-            let frequency = self.base_frequency * 2.0_f32.powf(cents / 1200.0);
+            let frequency = self.base_frequency * libm::powf(2.0, cents / 1200.0);
 
             for oscillator in &mut self.oscillators {
                 oscillator
@@ -185,6 +186,7 @@ impl Voice {
 mod tests {
     use super::*;
     use crate::{OscillatorAssignment, Waveform};
+    use alloc::vec;
 
     #[test]
     fn creates_and_decays_a_harmonic_partial() {

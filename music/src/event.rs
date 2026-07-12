@@ -1,7 +1,5 @@
 use crate::note::Note;
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NoteEvent {
     /// A key/note was pressed
@@ -43,7 +41,6 @@ mod tests {
             velocity: 100,
         };
 
-        println!("{event:?}");
         assert!(matches!(event, NoteEvent::NoteOn { .. }));
     }
 }

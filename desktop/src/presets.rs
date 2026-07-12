@@ -209,6 +209,12 @@ pub struct EnvelopePreset {
     pub sustain_level: f32,
     #[serde(rename = "@release_seconds")]
     pub release_seconds: f32,
+    #[serde(rename = "@release_curvature", default = "default_release_curvature")]
+    pub release_curvature: f32,
+}
+
+fn default_release_curvature() -> f32 {
+    3.0
 }
 
 impl Default for EnvelopePreset {
@@ -218,6 +224,7 @@ impl Default for EnvelopePreset {
             decay_seconds: 0.2,
             sustain_level: 0.7,
             release_seconds: 0.5,
+            release_curvature: default_release_curvature(),
         }
     }
 }
@@ -290,6 +297,13 @@ impl Preset {
         validate_non_negative(self.envelope.decay_seconds, "decay", &context())?;
         validate_range(self.envelope.sustain_level, 0.0, 1.0, "sustain", &context())?;
         validate_non_negative(self.envelope.release_seconds, "release", &context())?;
+        validate_range(
+            self.envelope.release_curvature,
+            -10.0,
+            10.0,
+            "release curvature",
+            &context(),
+        )?;
 
         let oscillators = self
             .oscillators
@@ -304,13 +318,15 @@ impl Preset {
                     )
             })
             .collect();
-        let mut instrument =
-            Instrument::new(self.name.clone(), oscillators).with_envelope(EnvelopeSettings::new(
+        let mut instrument = Instrument::new(self.name.clone(), oscillators).with_envelope(
+            EnvelopeSettings::new(
                 self.envelope.attack_seconds,
                 self.envelope.decay_seconds,
                 self.envelope.sustain_level,
                 self.envelope.release_seconds,
-            ));
+            )
+            .with_release_curvature(self.envelope.release_curvature),
+        );
 
         if let Some(hammer) = &self.hammer {
             validate_non_negative(hammer.gain, "hammer gain", &context())?;
@@ -458,6 +474,7 @@ mod tests {
         assert!(instruments[0].chorus().is_some());
         assert!(instruments[0].flanger().is_some());
         assert!(instruments[0].reverb().is_some());
+        assert_eq!(bank.presets[0].envelope.release_curvature, 3.0);
     }
 
     #[test]

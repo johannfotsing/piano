@@ -64,7 +64,7 @@ impl Note {
             + self.pitch.semitone() as i32
             - Pitch::A.semitone() as i32;
 
-        A4_FREQUENCY * 2.0_f64.powf(semitone_offset as f64 / 12.0)
+        A4_FREQUENCY * libm::pow(2.0, semitone_offset as f64 / 12.0)
     }
 
     pub fn midi_number(&self) -> u8 {

@@ -402,13 +402,20 @@ impl PresetEditor {
         let size = egui::vec2(64.0, 68.0);
         let (rect, mut response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
         let input_rect = egui::Rect::from_min_size(rect.min, egui::vec2(rect.width(), 18.0));
-        let input_response = ui.put(
-            input_rect,
-            egui::DragValue::new(value)
-                .range(range.clone())
-                .speed(speed)
-                .fixed_decimals(decimals),
-        );
+        let input_response = ui
+            .scope(|ui| {
+                ui.style_mut()
+                    .text_styles
+                    .insert(egui::TextStyle::Body, egui::FontId::proportional(15.0));
+                ui.put(
+                    input_rect,
+                    egui::DragValue::new(value)
+                        .range(range.clone())
+                        .speed(speed)
+                        .fixed_decimals(decimals),
+                )
+            })
+            .inner;
         let knob_rect =
             egui::Rect::from_min_max(egui::pos2(rect.left(), rect.top() + 20.0), rect.max);
         let start_id = response.id.with("drag_start");
@@ -1289,13 +1296,27 @@ impl PresetEditor {
         let attack_end = envelope.attack_seconds;
         let decay_end = attack_end + envelope.decay_seconds;
         let sustain_end = decay_end + sustain_seconds;
-        let points = vec![
+        let mut points = vec![
             egui::pos2(x_at(0.0), y_at(0.0)),
             egui::pos2(x_at(attack_end), y_at(1.0)),
             egui::pos2(x_at(decay_end), y_at(envelope.sustain_level)),
             egui::pos2(x_at(sustain_end), y_at(envelope.sustain_level)),
-            egui::pos2(x_at(total), y_at(0.0)),
         ];
+        let release_scale = envelope.release_curvature.exp() - 1.0;
+        for index in 1..=32 {
+            let progress = index as f32 / 32.0;
+            let amplitude = if envelope.release_curvature.abs() <= f32::EPSILON {
+                1.0 - progress
+            } else {
+                let exponential_progress =
+                    ((envelope.release_curvature * progress).exp() - 1.0) / release_scale;
+                1.0 - exponential_progress
+            };
+            points.push(egui::pos2(
+                x_at(sustain_end + envelope.release_seconds * progress),
+                y_at(envelope.sustain_level * amplitude.max(0.0)),
+            ));
+        }
         painter.add(egui::Shape::line(
             points,
             egui::Stroke::new(2.0, ui.visuals().selection.stroke.color),
@@ -1321,11 +1342,12 @@ impl PresetEditor {
             );
         }
         response.on_hover_text(format!(
-            "Attack {:.2}s · Decay {:.2}s · Sustain {:.2} · Release {:.2}s",
+            "Attack {:.2}s · Decay {:.2}s · Sustain {:.2} · Release {:.2}s · Curvature {:.2}",
             envelope.attack_seconds,
             envelope.decay_seconds,
             envelope.sustain_level,
-            envelope.release_seconds
+            envelope.release_seconds,
+            envelope.release_curvature
         ));
     }
 
@@ -1370,6 +1392,15 @@ impl PresetEditor {
                                 "Release (s)",
                                 &mut envelope.release_seconds,
                                 0.0..=20.0,
+                                0.02,
+                                2,
+                            );
+                            ui.end_row();
+                            Self::knob_item(
+                                ui,
+                                "Release curvature",
+                                &mut envelope.release_curvature,
+                                -10.0..=10.0,
                                 0.02,
                                 2,
                             );

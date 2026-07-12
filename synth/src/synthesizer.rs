@@ -46,7 +46,7 @@ impl Synthesizer {
         }
 
         // Final soft limiter runs after the effects and their feedback paths.
-        sample.tanh()
+        libm::tanhf(sample)
     }
 
     pub fn set_master_gain(&mut self, gain: f32) {

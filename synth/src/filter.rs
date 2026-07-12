@@ -60,7 +60,7 @@ impl StateVariableFilter {
         assert!(sample_rate.is_finite() && sample_rate > 0.0);
 
         let cutoff_hz = settings.cutoff_hz().clamp(1.0, sample_rate * 0.49);
-        let g = (PI * cutoff_hz / sample_rate).tan();
+        let g = libm::tanf(PI * cutoff_hz / sample_rate);
         let k = 1.0 / settings.resonance_q();
         let a1 = 1.0 / (1.0 + g * (g + k));
         let a2 = g * a1;

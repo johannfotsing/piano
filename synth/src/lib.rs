@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 pub mod effects;
 pub mod envelope;
 pub mod filter;

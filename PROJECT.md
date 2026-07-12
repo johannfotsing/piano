@@ -239,6 +239,14 @@ engine
 
 fully no_std.
 
+Boundary design: see [`NO_STD.md`](NO_STD.md).
+
+- [x] Make `music` allocator-free and `no_std`
+- [x] Make `synth` use `core` + `alloc`
+- [x] Remove platform adapter dependencies from `engine`
+- [x] Make `engine` use `core` + `alloc`
+- [ ] Add an STM32 target-specific build check
+
 Desktop still works.
 
 This is a significant milestone because it proves your core logic is portable.

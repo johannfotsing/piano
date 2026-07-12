@@ -1,3 +1,5 @@
+use alloc::{vec, vec::Vec};
+
 use crate::{Chorus, Flanger, Lfo, LfoWaveform, Reverb};
 
 struct FractionalDelay {
@@ -7,7 +9,7 @@ struct FractionalDelay {
 
 impl FractionalDelay {
     fn new(max_delay_samples: f32) -> Self {
-        let length = max_delay_samples.ceil() as usize + 2;
+        let length = libm::ceilf(max_delay_samples) as usize + 2;
         Self {
             buffer: vec![0.0; length.max(3)],
             write_index: 0,
@@ -17,8 +19,9 @@ impl FractionalDelay {
     fn read(&self, delay_samples: f32) -> f32 {
         let delay_samples = delay_samples.clamp(0.0, self.buffer.len() as f32 - 2.0);
         let length = self.buffer.len() as f32;
-        let position = (self.write_index as f32 - delay_samples).rem_euclid(length);
-        let first = position.floor() as usize;
+        let raw_position = self.write_index as f32 - delay_samples;
+        let position = raw_position - libm::floorf(raw_position / length) * length;
+        let first = libm::floorf(position) as usize;
         let second = (first + 1) % self.buffer.len();
         let fraction = position - first as f32;
         self.buffer[first] * (1.0 - fraction) + self.buffer[second] * fraction
@@ -109,7 +112,7 @@ struct CombFilter {
 impl CombFilter {
     fn new(delay_seconds: f32, sample_rate: f32, feedback: f32, damping: f32) -> Self {
         Self {
-            buffer: vec![0.0; (delay_seconds * sample_rate).round().max(1.0) as usize],
+            buffer: vec![0.0; libm::roundf(delay_seconds * sample_rate).max(1.0) as usize],
             index: 0,
             feedback,
             damping,
@@ -135,7 +138,7 @@ struct AllPassFilter {
 impl AllPassFilter {
     fn new(delay_seconds: f32, sample_rate: f32, feedback: f32) -> Self {
         Self {
-            buffer: vec![0.0; (delay_seconds * sample_rate).round().max(1.0) as usize],
+            buffer: vec![0.0; libm::roundf(delay_seconds * sample_rate).max(1.0) as usize],
             index: 0,
             feedback,
         }

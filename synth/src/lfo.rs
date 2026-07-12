@@ -29,7 +29,7 @@ impl Lfo {
 
     pub fn next_sample(&mut self) -> f32 {
         let sample = match self.waveform {
-            LfoWaveform::Sine => (self.phase * TAU).sin(),
+            LfoWaveform::Sine => libm::sinf(self.phase * TAU),
             LfoWaveform::Triangle => 1.0 - 4.0 * (self.phase - 0.5).abs(),
         };
 

@@ -46,7 +46,7 @@ impl Oscillator {
     /// Returns a value between -1.0 and 1.0.
     pub fn next_sample(&mut self) -> f32 {
         let sample = match self.waveform {
-            Waveform::Sine => (self.phase * TAU).sin(),
+            Waveform::Sine => libm::sinf(self.phase * TAU),
             Waveform::Square => {
                 if self.phase < 0.5 {
                     1.0

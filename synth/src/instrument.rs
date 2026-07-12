@@ -1,3 +1,5 @@
+use alloc::{string::String, vec::Vec};
+
 use crate::{EnvelopeSettings, FilterSettings, Waveform};
 
 /// An oscillator definition and its contribution to an instrument's sound.
@@ -374,6 +376,7 @@ impl Instrument {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn adds_tremolo_to_an_instrument() {
