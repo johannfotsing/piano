@@ -1,5 +1,5 @@
 use music::event::NoteEvent;
-use synth::{Instrument, OscillatorAssignment, Synthesizer, Waveform};
+use synth::{Instrument, OscillatorAssignment, Synthesizer, Vibrato, Waveform};
 
 pub struct App {
     synthesizer: Synthesizer,
@@ -54,7 +54,8 @@ impl App {
                         OscillatorAssignment::new(Waveform::Triangle, 0.7),
                         OscillatorAssignment::new(Waveform::Sine, 0.3),
                     ],
-                ),
+                )
+                .with_vibrato(Vibrato::new(5.0, 12.0)),
             ],
             selected_instrument: 0,
         }

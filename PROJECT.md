@@ -221,8 +221,8 @@ Add:
 - [x] triangle
 - [x] saw wave
 - [ ] filters
-- [ ] LFO
-- [ ] vibrato
+- [x] LFO
+- [x] vibrato
 - [ ] tremolo
 
 At this point, you're building a real synthesizer.
