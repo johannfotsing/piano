@@ -211,23 +211,23 @@ The engine doesn't care where notes originate.
 
 ---
 
-## CHAT GPT's project roadmap
-
 Phase 9 – Better Synth
 
 Improve the sound.
 
 Add:
 
-square wave
-triangle
-saw wave
-filters
-LFO
-vibrato
-tremolo
+- [x] square wave
+- [x] triangle
+- [x] saw wave
+- [ ] filters
+- [ ] LFO
+- [ ] vibrato
+- [ ] tremolo
 
 At this point, you're building a real synthesizer.
+
+## CHAT GPT's project roadmap
 
 Phase 10 – Embedded Preparation
 

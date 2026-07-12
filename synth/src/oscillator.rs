@@ -48,7 +48,11 @@ impl Oscillator {
         let sample = match self.waveform {
             Waveform::Sine => (self.phase * TAU).sin(),
             Waveform::Square => {
-                if self.phase < 0.5 { 1.0 } else { -1.0 }
+                if self.phase < 0.5 {
+                    1.0
+                } else {
+                    -1.0
+                }
             }
             Waveform::Sawtooth => 2.0 * self.phase - 1.0,
             // sign(0.5 - phi) and phi % 0.5 might create a discontiunity at phi = 0.5, but it is a triangle wave.

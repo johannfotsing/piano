@@ -6,7 +6,7 @@ use engine::App;
 use music::event::NoteEvent;
 use synth::Synthesizer;
 
-pub fn start_audio(receiver: Receiver<NoteEvent>) -> cpal::Stream {
+pub fn start_audio(receiver: Receiver<NoteEvent>) -> (cpal::Stream, Vec<&'static str>) {
     let host = cpal::default_host();
 
     let device = host.default_output_device().expect("No output device");
@@ -21,6 +21,11 @@ pub fn start_audio(receiver: Receiver<NoteEvent>) -> cpal::Stream {
     let sample_rate = config.sample_rate as f32;
     let synthesizer = Synthesizer::new(sample_rate);
     let mut app = App::new(synthesizer);
+    let instrument_names = app
+        .instruments()
+        .iter()
+        .map(|instrument| instrument.name())
+        .collect();
 
     let stream = match supported_config.sample_format() {
         cpal::SampleFormat::F32 => {
@@ -56,5 +61,5 @@ pub fn start_audio(receiver: Receiver<NoteEvent>) -> cpal::Stream {
 
     stream.play().unwrap();
 
-    stream
+    (stream, instrument_names)
 }

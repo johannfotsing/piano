@@ -1,4 +1,4 @@
-use crate::Voice;
+use crate::{Instrument, Voice};
 use music::note::Note;
 
 pub struct VoiceManager {
@@ -14,8 +14,9 @@ impl VoiceManager {
         }
     }
 
-    pub fn note_on(&mut self, note: Note, velocity: u8, sample_rate: f32) {
-        self.voices.push(Voice::new(note, velocity, sample_rate));
+    pub fn note_on(&mut self, note: Note, velocity: u8, sample_rate: f32, instrument: &Instrument) {
+        self.voices
+            .push(Voice::new(note, velocity, sample_rate, instrument));
     }
 
     pub fn note_off(&mut self, note: Note) {

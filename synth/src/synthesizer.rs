@@ -1,4 +1,4 @@
-use crate::VoiceManager;
+use crate::{Instrument, VoiceManager};
 use music::note::Note;
 
 /// Top-level synthesizer responsible for creating and rendering voices.
@@ -17,9 +17,9 @@ impl Synthesizer {
         }
     }
 
-    pub fn note_on(&mut self, note: Note, velocity: u8) {
+    pub fn note_on(&mut self, note: Note, velocity: u8, instrument: &Instrument) {
         self.voice_manager
-            .note_on(note, velocity, self.sample_rate);
+            .note_on(note, velocity, self.sample_rate, instrument);
     }
 
     pub fn note_off(&mut self, note: Note) {
