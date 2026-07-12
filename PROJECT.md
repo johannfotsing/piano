@@ -223,7 +223,7 @@ Add:
 - [ ] filters
 - [x] LFO
 - [x] vibrato
-- [ ] tremolo
+- [x] tremolo
 
 At this point, you're building a real synthesizer.
 

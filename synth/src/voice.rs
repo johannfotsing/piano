@@ -11,10 +11,16 @@ struct VoiceVibrato {
     depth_cents: f32,
 }
 
+struct VoiceTremolo {
+    lfo: Lfo,
+    depth: f32,
+}
+
 pub struct Voice {
     oscillators: Vec<VoiceOscillator>,
     envelope: Adsr,
     vibrato: Option<VoiceVibrato>,
+    tremolo: Option<VoiceTremolo>,
 
     note: Note,
     base_frequency: f32,
@@ -50,11 +56,16 @@ impl Voice {
             lfo: Lfo::new(vibrato.rate_hz(), sample_rate, LfoWaveform::Sine),
             depth_cents: vibrato.depth_cents(),
         });
+        let tremolo = instrument.tremolo().map(|tremolo| VoiceTremolo {
+            lfo: Lfo::new(tremolo.rate_hz(), sample_rate, LfoWaveform::Sine),
+            depth: tremolo.depth(),
+        });
 
         Self {
             oscillators,
             envelope,
             vibrato,
+            tremolo,
             note,
             base_frequency,
             velocity: (velocity as f32 / 127.0).powf(2.0),
@@ -72,7 +83,11 @@ impl Voice {
         }
 
         let envelope = self.envelope.next_sample();
-        let amplitude = envelope * self.velocity;
+        let tremolo_gain = self.tremolo.as_mut().map_or(1.0, |tremolo| {
+            let unipolar_lfo = (tremolo.lfo.next_sample() + 1.0) * 0.5;
+            1.0 - tremolo.depth * unipolar_lfo
+        });
+        let amplitude = envelope * self.velocity * tremolo_gain;
         let oscillator_mix = self
             .oscillators
             .iter_mut()
