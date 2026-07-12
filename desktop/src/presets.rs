@@ -406,7 +406,8 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("presets.xml");
         let bank = PresetBank::load(&path).unwrap();
 
-        assert_eq!(bank.presets.len(), 5);
+        assert_eq!(bank.presets.len(), 6);
         assert_eq!(bank.presets[4].name, "Warm");
+        assert_eq!(bank.presets[5].name, "Classical Piano");
     }
 }
