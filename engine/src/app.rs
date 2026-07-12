@@ -1,5 +1,7 @@
 use music::event::NoteEvent;
-use synth::{Instrument, OscillatorAssignment, Synthesizer, Tremolo, Vibrato, Waveform};
+use synth::{
+    FilterSettings, Instrument, OscillatorAssignment, Synthesizer, Tremolo, Vibrato, Waveform,
+};
 
 pub struct App {
     synthesizer: Synthesizer,
@@ -55,6 +57,7 @@ impl App {
                         OscillatorAssignment::new(Waveform::Sine, 0.3),
                     ],
                 )
+                .with_filter(FilterSettings::low_pass(2_500.0, 0.707))
                 .with_vibrato(Vibrato::new(5.0, 12.0))
                 .with_tremolo(Tremolo::new(4.0, 0.2)),
             ],

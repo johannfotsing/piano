@@ -1,4 +1,4 @@
-use crate::Waveform;
+use crate::{FilterSettings, Waveform};
 
 /// An oscillator definition and its contribution to an instrument's sound.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -79,6 +79,7 @@ pub struct Instrument {
     oscillators: Vec<OscillatorAssignment>,
     vibrato: Option<Vibrato>,
     tremolo: Option<Tremolo>,
+    filter: Option<FilterSettings>,
 }
 
 impl Instrument {
@@ -89,6 +90,7 @@ impl Instrument {
             oscillators,
             vibrato: None,
             tremolo: None,
+            filter: None,
         }
     }
 
@@ -117,6 +119,15 @@ impl Instrument {
     pub const fn tremolo(&self) -> Option<Tremolo> {
         self.tremolo
     }
+
+    pub fn with_filter(mut self, filter: FilterSettings) -> Self {
+        self.filter = Some(filter);
+        self
+    }
+
+    pub const fn filter(&self) -> Option<FilterSettings> {
+        self.filter
+    }
 }
 
 #[cfg(test)]
@@ -132,5 +143,18 @@ mod tests {
         let tremolo = instrument.tremolo().unwrap();
         assert_eq!(tremolo.rate_hz(), 4.0);
         assert_eq!(tremolo.depth(), 0.25);
+    }
+
+    #[test]
+    fn adds_filter_to_an_instrument() {
+        let instrument = Instrument::new(
+            "Test",
+            vec![OscillatorAssignment::new(Waveform::Sawtooth, 1.0)],
+        )
+        .with_filter(FilterSettings::low_pass(2_500.0, 0.707));
+
+        let filter = instrument.filter().unwrap();
+        assert_eq!(filter.mode(), crate::FilterMode::LowPass);
+        assert_eq!(filter.cutoff_hz(), 2_500.0);
     }
 }
