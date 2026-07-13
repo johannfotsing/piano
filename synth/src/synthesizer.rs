@@ -1,4 +1,6 @@
-use crate::{ChorusProcessor, FlangerProcessor, Instrument, ReverbProcessor, VoiceManager};
+use crate::{
+    ChorusProcessor, FlangerProcessor, Instrument, ReverbProcessor, VoiceManager, VoiceMixingPolicy,
+};
 use music::note::Note;
 
 /// Top-level synthesizer responsible for creating and rendering voices.
@@ -51,6 +53,23 @@ impl Synthesizer {
 
     pub fn set_master_gain(&mut self, gain: f32) {
         self.voice_manager.set_master_gain(gain);
+    }
+
+    pub fn with_voice_mixing_policy(mut self, policy: VoiceMixingPolicy) -> Self {
+        self.set_voice_mixing_policy(policy);
+        self
+    }
+
+    pub fn set_voice_mixing_policy(&mut self, policy: VoiceMixingPolicy) {
+        self.voice_manager.set_mixing_policy(policy);
+    }
+
+    pub const fn voice_mixing_policy(&self) -> VoiceMixingPolicy {
+        self.voice_manager.mixing_policy()
+    }
+
+    pub fn active_voice_count(&self) -> usize {
+        self.voice_manager.active_voice_count()
     }
 
     pub fn configure_effects(&mut self, instrument: &Instrument) {

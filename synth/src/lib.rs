@@ -22,4 +22,6 @@ pub use lfo::{Lfo, LfoWaveform};
 pub use oscillator::{Oscillator, Waveform};
 pub use synthesizer::Synthesizer;
 pub use voice::Voice;
-pub use voice_manager::VoiceManager;
+pub use voice_manager::{
+    DEFAULT_MAX_POLYPHONY, VoiceManager, VoiceMixingPolicy, VoiceStealingPolicy,
+};

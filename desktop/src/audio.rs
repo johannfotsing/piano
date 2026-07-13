@@ -10,6 +10,7 @@ pub enum AudioCommand {
     Event(NoteEvent),
     SelectInstrument(usize),
     ReplaceInstruments(Vec<Instrument>),
+    SetMasterGain(f32),
 }
 
 pub fn start_audio(
@@ -55,6 +56,9 @@ pub fn start_audio(
                             }
                             AudioCommand::ReplaceInstruments(instruments) => {
                                 app.replace_instruments(instruments);
+                            }
+                            AudioCommand::SetMasterGain(gain) => {
+                                app.set_master_gain(gain);
                             }
                         }
                     }

@@ -237,6 +237,10 @@ impl Adsr {
     pub fn is_finished(&self) -> bool {
         self.state == EnvelopeState::Idle
     }
+
+    pub fn is_releasing(&self) -> bool {
+        self.state == EnvelopeState::Release
+    }
 }
 
 #[cfg(test)]

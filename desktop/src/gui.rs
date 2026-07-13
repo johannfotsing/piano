@@ -30,6 +30,7 @@ pub struct PresetEditor {
     show_midi_setup: bool,
     midi_status: String,
     status: String,
+    master_gain: f32,
     keyboard_notes: HashSet<Note>,
     pending_preset_deletion: Option<usize>,
 }
@@ -62,6 +63,7 @@ impl PresetEditor {
             show_midi_setup: true,
             midi_status,
             status: "Presets loaded from XML".into(),
+            master_gain: 0.2,
             keyboard_notes: HashSet::new(),
             pending_preset_deletion: None,
         }
@@ -1434,6 +1436,19 @@ impl eframe::App for PresetEditor {
                 }
                 ui.separator();
                 ui.label(&self.status);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(egui::RichText::new("Master volume").size(11.0));
+                        if Self::knob(ui, &mut self.master_gain, 0.0..=1.0, 0.005, 2).changed()
+                            && self
+                                .command_sender
+                                .send(AudioCommand::SetMasterGain(self.master_gain))
+                                .is_err()
+                        {
+                            self.status = "Audio thread is unavailable".into();
+                        }
+                    });
+                });
             });
             ui.separator();
 

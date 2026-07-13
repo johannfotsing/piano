@@ -180,6 +180,10 @@ impl Voice {
     pub fn is_finished(&self) -> bool {
         self.envelope.is_finished()
     }
+
+    pub fn is_releasing(&self) -> bool {
+        self.envelope.is_releasing()
+    }
 }
 
 #[cfg(test)]
