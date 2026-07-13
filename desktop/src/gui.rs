@@ -906,8 +906,9 @@ impl PresetEditor {
     }
 
     fn paint_filter_graph(ui: &mut egui::Ui, filter: Option<&FilterPreset>) {
+        let graph_width = ui.available_width().max(280.0);
         let (rect, response) =
-            ui.allocate_exact_size(egui::vec2(360.0, 190.0), egui::Sense::hover());
+            ui.allocate_exact_size(egui::vec2(graph_width, 190.0), egui::Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
         painter.rect_stroke(
@@ -1041,54 +1042,64 @@ impl PresetEditor {
                 });
             }
             ui.separator();
-            ui.with_layout(
-                egui::Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
-                |ui| {
-                    ui.set_min_width(250.0);
-                    ui.vertical(|ui| {
-                        if let Some(filter) = filter.as_mut() {
-                            egui::Grid::new("filter_settings")
-                                .num_columns(2)
-                                .spacing([8.0, 4.0])
-                                .show(ui, |ui| {
-                                    Self::setting_item(ui, "Mode", |ui| {
-                                        Self::paint_filter_mode_preview(ui, filter.mode);
-                                        egui::ComboBox::from_id_salt("filter_mode")
-                                            .selected_text(filter.mode.label())
-                                            .show_ui(ui, |ui| {
-                                                for mode in FilterModePreset::ALL {
-                                                    ui.selectable_value(
-                                                        &mut filter.mode,
-                                                        mode,
-                                                        mode.label(),
-                                                    );
-                                                }
-                                            });
+            Self::paint_filter_graph(ui, filter.as_ref());
+            ui.add_space(8.0);
+            let available_width = ui.available_width();
+            if let Some(filter) = filter.as_mut() {
+                let spacing = 8.0;
+                let setting_card_width = 106.0;
+                let columns = (((available_width + spacing) / (setting_card_width + spacing))
+                    .floor()
+                    .max(1.0) as usize)
+                    .min(3);
+                let mut item_index = 0;
+                let mut finish_item = |ui: &mut egui::Ui| {
+                    item_index += 1;
+                    if item_index % columns == 0 {
+                        ui.end_row();
+                    }
+                };
+                ui.vertical_centered(|ui| {
+                    egui::Grid::new("filter_settings")
+                        .num_columns(columns)
+                        .spacing([spacing, spacing])
+                        .show(ui, |ui| {
+                            Self::setting_item(ui, "Mode", |ui| {
+                                Self::paint_filter_mode_preview(ui, filter.mode);
+                                egui::ComboBox::from_id_salt("filter_mode")
+                                    .selected_text(filter.mode.label())
+                                    .show_ui(ui, |ui| {
+                                        for mode in FilterModePreset::ALL {
+                                            ui.selectable_value(
+                                                &mut filter.mode,
+                                                mode,
+                                                mode.label(),
+                                            );
+                                        }
                                     });
-                                    Self::knob_item(
-                                        ui,
-                                        "Cutoff Hz",
-                                        &mut filter.cutoff_hz,
-                                        20.0..=20_000.0,
-                                        50.0,
-                                        0,
-                                    );
-                                    ui.end_row();
-                                    Self::knob_item(
-                                        ui,
-                                        "Resonance Q",
-                                        &mut filter.resonance_q,
-                                        0.5..=20.0,
-                                        0.02,
-                                        2,
-                                    );
-                                    ui.end_row();
-                                });
-                        }
-                    });
-                    Self::paint_filter_graph(ui, filter.as_ref());
-                },
-            );
+                            });
+                            finish_item(ui);
+                            Self::knob_item(
+                                ui,
+                                "Cutoff Hz",
+                                &mut filter.cutoff_hz,
+                                20.0..=20_000.0,
+                                50.0,
+                                0,
+                            );
+                            finish_item(ui);
+                            Self::knob_item(
+                                ui,
+                                "Resonance Q",
+                                &mut filter.resonance_q,
+                                0.5..=20.0,
+                                0.02,
+                                2,
+                            );
+                            finish_item(ui);
+                        });
+                });
+            }
         });
     }
 
@@ -1296,8 +1307,9 @@ impl PresetEditor {
     }
 
     fn paint_envelope_graph(ui: &mut egui::Ui, envelope: &EnvelopePreset) {
+        let graph_width = ui.available_width().max(280.0);
         let (rect, response) =
-            ui.allocate_exact_size(egui::vec2(360.0, 190.0), egui::Sense::hover());
+            ui.allocate_exact_size(egui::vec2(graph_width, 190.0), egui::Sense::hover());
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
         painter.rect_stroke(
@@ -1328,10 +1340,14 @@ impl PresetEditor {
             );
         }
 
-        // Sustain lasts until note-off, so use a representative plateau in the preview.
-        let sustain_seconds = (envelope.attack_seconds + envelope.decay_seconds)
-            .max(envelope.release_seconds)
-            .max(0.5);
+        // Unlimited sustain uses a representative plateau in the preview.
+        let sustain_seconds = if envelope.maximum_sustain_seconds > 0.0 {
+            envelope.maximum_sustain_seconds
+        } else {
+            (envelope.attack_seconds + envelope.decay_seconds)
+                .max(envelope.release_seconds)
+                .max(0.5)
+        };
         let total = (envelope.attack_seconds
             + envelope.decay_seconds
             + sustain_seconds
@@ -1367,13 +1383,31 @@ impl PresetEditor {
                 y_at(amplitude),
             ));
         }
-        points.push(egui::pos2(x_at(sustain_end), y_at(envelope.sustain_level)));
+        if envelope.maximum_sustain_seconds > 0.0 {
+            for index in 1..=32 {
+                let progress = index as f32 / 32.0;
+                let amplitude = envelope.sustain_level
+                    + (envelope.sustain_end_level - envelope.sustain_level)
+                        * curved_progress(progress, envelope.sustain_curvature);
+                points.push(egui::pos2(
+                    x_at(decay_end + sustain_seconds * progress),
+                    y_at(amplitude),
+                ));
+            }
+        } else {
+            points.push(egui::pos2(x_at(sustain_end), y_at(envelope.sustain_level)));
+        }
+        let release_start_level = if envelope.maximum_sustain_seconds > 0.0 {
+            envelope.sustain_end_level
+        } else {
+            envelope.sustain_level
+        };
         for index in 1..=32 {
             let progress = index as f32 / 32.0;
             let amplitude = 1.0 - curved_progress(progress, envelope.release_curvature);
             points.push(egui::pos2(
                 x_at(sustain_end + envelope.release_seconds * progress),
-                y_at(envelope.sustain_level * amplitude.max(0.0)),
+                y_at(release_start_level * amplitude.max(0.0)),
             ));
         }
         painter.add(egui::Shape::line(
@@ -1381,10 +1415,15 @@ impl PresetEditor {
             egui::Stroke::new(2.0, ui.visuals().selection.stroke.color),
         ));
 
+        let sustain_label = if envelope.maximum_sustain_seconds > 0.0 {
+            "S / maximum"
+        } else {
+            "S / note-off"
+        };
         for (seconds, label) in [
             (attack_end, "A"),
             (decay_end, "D"),
-            (sustain_end, "S / note-off"),
+            (sustain_end, sustain_label),
             (total, "R"),
         ] {
             let x = x_at(seconds);
@@ -1401,92 +1440,135 @@ impl PresetEditor {
             );
         }
         response.on_hover_text(format!(
-            "Attack {:.2}s / {:.2} · Decay {:.2}s / {:.2} · Sustain {:.2} · Release {:.2}s / {:.2}",
+            "Attack {:.2}s / {:.2} · Decay {:.2}s / {:.2} · Sustain {:.2} → {:.2} / {:.2} · Maximum sustain {:.2}s (0 = unlimited) · Release {:.2}s / {:.2}",
             envelope.attack_seconds,
             envelope.attack_curvature,
             envelope.decay_seconds,
             envelope.decay_curvature,
             envelope.sustain_level,
+            envelope.sustain_end_level,
+            envelope.sustain_curvature,
+            envelope.maximum_sustain_seconds,
             envelope.release_seconds,
             envelope.release_curvature
         ));
     }
 
     fn show_envelope(ui: &mut egui::Ui, envelope: &mut EnvelopePreset) {
+        envelope.sustain_end_level = envelope.sustain_end_level.min(envelope.sustain_level);
         ui.heading("Envelope (ADSR)");
         egui::Frame::group(ui.style()).show(ui, |ui| {
-            ui.with_layout(
-                egui::Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
-                |ui| {
-                    ui.set_min_width(250.0);
-                    egui::Grid::new("envelope_settings")
-                        .num_columns(2)
-                        .spacing([8.0, 4.0])
-                        .show(ui, |ui| {
-                            Self::knob_item(
-                                ui,
-                                "Attack (s)",
-                                &mut envelope.attack_seconds,
-                                0.0..=10.0,
-                                0.01,
-                                2,
-                            );
-                            Self::knob_item(
-                                ui,
-                                "Attack curvature",
-                                &mut envelope.attack_curvature,
-                                -10.0..=10.0,
-                                0.02,
-                                2,
-                            );
-                            ui.end_row();
-                            Self::knob_item(
-                                ui,
-                                "Decay (s)",
-                                &mut envelope.decay_seconds,
-                                0.0..=10.0,
-                                0.01,
-                                2,
-                            );
-                            Self::knob_item(
-                                ui,
-                                "Decay curvature",
-                                &mut envelope.decay_curvature,
-                                -10.0..=10.0,
-                                0.02,
-                                2,
-                            );
-                            ui.end_row();
-                            Self::knob_item(
-                                ui,
-                                "Sustain",
-                                &mut envelope.sustain_level,
-                                0.0..=1.0,
-                                0.005,
-                                2,
-                            );
-                            Self::knob_item(
-                                ui,
-                                "Release (s)",
-                                &mut envelope.release_seconds,
-                                0.0..=20.0,
-                                0.02,
-                                2,
-                            );
-                            ui.end_row();
-                            Self::knob_item(
-                                ui,
-                                "Release curvature",
-                                &mut envelope.release_curvature,
-                                -10.0..=10.0,
-                                0.02,
-                                2,
-                            );
-                            ui.end_row();
-                        });
-                    Self::paint_envelope_graph(ui, envelope);
-                },
-            );
+            ui.vertical(|ui| {
+                Self::paint_envelope_graph(ui, envelope);
+                ui.add_space(8.0);
+                let spacing = 8.0;
+                let setting_card_width = 106.0;
+                let columns = ((ui.available_width() + spacing) / (setting_card_width + spacing))
+                    .floor()
+                    .max(1.0) as usize;
+                let mut item_index = 0;
+                let mut finish_item = |ui: &mut egui::Ui| {
+                    item_index += 1;
+                    if item_index % columns == 0 {
+                        ui.end_row();
+                    }
+                };
+                egui::Grid::new("envelope_settings")
+                    .num_columns(columns)
+                    .spacing([spacing, spacing])
+                    .show(ui, |ui| {
+                        Self::knob_item(
+                            ui,
+                            "Attack (s)",
+                            &mut envelope.attack_seconds,
+                            0.0..=10.0,
+                            0.01,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Attack curvature",
+                            &mut envelope.attack_curvature,
+                            -10.0..=10.0,
+                            0.02,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Decay (s)",
+                            &mut envelope.decay_seconds,
+                            0.0..=10.0,
+                            0.01,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Decay curvature",
+                            &mut envelope.decay_curvature,
+                            -10.0..=10.0,
+                            0.02,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Sustain",
+                            &mut envelope.sustain_level,
+                            0.0..=1.0,
+                            0.005,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Maximum sustain (s, 0 = unlimited)",
+                            &mut envelope.maximum_sustain_seconds,
+                            0.0..=120.0,
+                            0.1,
+                            1,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Sustain end",
+                            &mut envelope.sustain_end_level,
+                            0.0..=envelope.sustain_level,
+                            0.005,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Sustain curvature",
+                            &mut envelope.sustain_curvature,
+                            -10.0..=10.0,
+                            0.02,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Release (s)",
+                            &mut envelope.release_seconds,
+                            0.0..=20.0,
+                            0.02,
+                            2,
+                        );
+                        finish_item(ui);
+                        Self::knob_item(
+                            ui,
+                            "Release curvature",
+                            &mut envelope.release_curvature,
+                            -10.0..=10.0,
+                            0.02,
+                            2,
+                        );
+                        finish_item(ui);
+                    });
+            });
         });
     }
 }

@@ -225,6 +225,12 @@ pub struct EnvelopePreset {
     pub decay_curvature: f32,
     #[serde(rename = "@sustain_level")]
     pub sustain_level: f32,
+    #[serde(rename = "@sustain_end_level", default)]
+    pub sustain_end_level: f32,
+    #[serde(rename = "@sustain_curvature", default)]
+    pub sustain_curvature: f32,
+    #[serde(rename = "@maximum_sustain_seconds", default)]
+    pub maximum_sustain_seconds: f32,
     #[serde(rename = "@release_seconds")]
     pub release_seconds: f32,
     #[serde(rename = "@release_curvature", default = "default_release_curvature")]
@@ -243,6 +249,9 @@ impl Default for EnvelopePreset {
             decay_seconds: 0.2,
             decay_curvature: 0.0,
             sustain_level: 0.7,
+            sustain_end_level: 0.0,
+            sustain_curvature: 0.0,
+            maximum_sustain_seconds: 0.0,
             release_seconds: 0.5,
             release_curvature: default_release_curvature(),
         }
@@ -330,6 +339,25 @@ impl Preset {
             &context(),
         )?;
         validate_range(self.envelope.sustain_level, 0.0, 1.0, "sustain", &context())?;
+        validate_range(
+            self.envelope.sustain_end_level,
+            0.0,
+            self.envelope.sustain_level,
+            "sustain end level",
+            &context(),
+        )?;
+        validate_range(
+            self.envelope.sustain_curvature,
+            -10.0,
+            10.0,
+            "sustain curvature",
+            &context(),
+        )?;
+        validate_non_negative(
+            self.envelope.maximum_sustain_seconds,
+            "maximum sustain",
+            &context(),
+        )?;
         validate_non_negative(self.envelope.release_seconds, "release", &context())?;
         validate_range(
             self.envelope.release_curvature,
@@ -361,6 +389,11 @@ impl Preset {
             )
             .with_attack_curvature(self.envelope.attack_curvature)
             .with_decay_curvature(self.envelope.decay_curvature)
+            .with_maximum_sustain(self.envelope.maximum_sustain_seconds)
+            .with_sustain_shape(
+                self.envelope.sustain_end_level,
+                self.envelope.sustain_curvature,
+            )
             .with_release_curvature(self.envelope.release_curvature),
         );
 
@@ -531,6 +564,9 @@ mod tests {
         assert!(instruments[0].reverb().is_some());
         assert_eq!(bank.presets[0].envelope.attack_curvature, 0.0);
         assert_eq!(bank.presets[0].envelope.decay_curvature, 0.0);
+        assert_eq!(bank.presets[0].envelope.sustain_end_level, 0.0);
+        assert_eq!(bank.presets[0].envelope.sustain_curvature, 0.0);
+        assert_eq!(bank.presets[0].envelope.maximum_sustain_seconds, 0.0);
         assert_eq!(bank.presets[0].envelope.release_curvature, 3.0);
     }
 

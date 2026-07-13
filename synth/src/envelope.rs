@@ -14,6 +14,9 @@ pub struct EnvelopeSettings {
     decay_seconds: f32,
     decay_curvature: f32,
     sustain_level: f32,
+    sustain_end_level: f32,
+    sustain_curvature: f32,
+    maximum_sustain_seconds: f32,
     release_seconds: f32,
     release_curvature: f32,
 }
@@ -36,6 +39,9 @@ impl EnvelopeSettings {
             decay_seconds,
             decay_curvature: 0.0,
             sustain_level,
+            sustain_end_level: sustain_level,
+            sustain_curvature: 0.0,
+            maximum_sustain_seconds: 0.0,
             release_seconds,
             release_curvature: 3.0,
         }
@@ -59,6 +65,22 @@ impl EnvelopeSettings {
         self
     }
 
+    /// Limits the sustain stage while a note remains held. Zero disables the limit.
+    pub fn with_maximum_sustain(mut self, maximum_sustain_seconds: f32) -> Self {
+        assert!(maximum_sustain_seconds.is_finite() && maximum_sustain_seconds >= 0.0);
+        self.maximum_sustain_seconds = maximum_sustain_seconds;
+        self
+    }
+
+    /// Shapes a limited sustain from `sustain_level` toward `end_level`.
+    pub fn with_sustain_shape(mut self, end_level: f32, curvature: f32) -> Self {
+        assert!(end_level.is_finite() && (0.0..=self.sustain_level).contains(&end_level));
+        validate_curvature(curvature);
+        self.sustain_end_level = end_level;
+        self.sustain_curvature = curvature;
+        self
+    }
+
     pub const fn attack_seconds(&self) -> f32 {
         self.attack_seconds
     }
@@ -77,6 +99,18 @@ impl EnvelopeSettings {
 
     pub const fn sustain_level(&self) -> f32 {
         self.sustain_level
+    }
+
+    pub const fn maximum_sustain_seconds(&self) -> f32 {
+        self.maximum_sustain_seconds
+    }
+
+    pub const fn sustain_end_level(&self) -> f32 {
+        self.sustain_end_level
+    }
+
+    pub const fn sustain_curvature(&self) -> f32 {
+        self.sustain_curvature
     }
 
     pub const fn release_seconds(&self) -> f32 {
@@ -102,6 +136,10 @@ pub struct Adsr {
     decay_curvature: f32,
     decay_curve_scale: f32,
     sustain_level: f32,
+    sustain_end_level: f32,
+    sustain_curvature: f32,
+    sustain_curve_scale: f32,
+    maximum_sustain_samples: u32,
     release_samples: u32,
     release_curvature: f32,
     release_curve_scale: f32,
@@ -115,7 +153,7 @@ pub struct Adsr {
 
 impl Adsr {
     pub fn from_settings(sample_rate: f32, settings: EnvelopeSettings) -> Self {
-        Self::new_with_curvatures(
+        let mut envelope = Self::new_with_curvatures(
             sample_rate,
             settings.attack_seconds(),
             settings.attack_curvature(),
@@ -124,7 +162,13 @@ impl Adsr {
             settings.sustain_level(),
             settings.release_seconds(),
             settings.release_curvature(),
-        )
+        );
+        envelope.maximum_sustain_samples =
+            (settings.maximum_sustain_seconds() * sample_rate) as u32;
+        envelope.sustain_end_level = settings.sustain_end_level();
+        envelope.sustain_curvature = settings.sustain_curvature();
+        envelope.sustain_curve_scale = curve_scale(settings.sustain_curvature());
+        envelope
     }
 
     pub fn new(
@@ -188,6 +232,10 @@ impl Adsr {
             decay_curve_scale: curve_scale(decay_curvature),
 
             sustain_level,
+            sustain_end_level: sustain_level,
+            sustain_curvature: 0.0,
+            sustain_curve_scale: 0.0,
+            maximum_sustain_samples: 0,
 
             release_samples: (release_seconds * sample_rate) as u32,
             release_curvature,
@@ -266,7 +314,27 @@ impl Adsr {
             }
 
             EnvelopeState::Sustain => {
-                self.current_level = self.sustain_level;
+                if self.maximum_sustain_samples > 0
+                    && self.sample_counter >= self.maximum_sustain_samples
+                {
+                    self.current_level = self.sustain_end_level;
+                    self.note_off();
+                } else {
+                    if self.maximum_sustain_samples > 0 {
+                        let progress =
+                            self.sample_counter as f32 / self.maximum_sustain_samples as f32;
+                        let curved_progress = curve_progress(
+                            progress,
+                            self.sustain_curvature,
+                            self.sustain_curve_scale,
+                        );
+                        self.current_level = self.sustain_level
+                            + (self.sustain_end_level - self.sustain_level) * curved_progress;
+                    } else {
+                        self.current_level = self.sustain_level;
+                    }
+                    self.sample_counter = self.sample_counter.saturating_add(1);
+                }
             }
 
             EnvelopeState::Release => {
@@ -410,5 +478,59 @@ mod tests {
 
         assert!(delayed.next_sample() > 0.5);
         assert!(accelerated.next_sample() < 0.5);
+    }
+
+    #[test]
+    fn maximum_sustain_automatically_starts_release() {
+        let settings = EnvelopeSettings::new(0.0, 0.0, 1.0, 0.2).with_maximum_sustain(0.3);
+        let mut envelope = Adsr::from_settings(10.0, settings);
+        envelope.note_on();
+        envelope.next_sample(); // Attack -> Decay
+        envelope.next_sample(); // Decay -> Sustain
+
+        for _ in 0..3 {
+            assert_eq!(envelope.next_sample(), 1.0);
+        }
+        assert!(!envelope.is_releasing());
+
+        envelope.next_sample();
+        assert!(envelope.is_releasing());
+    }
+
+    #[test]
+    fn zero_maximum_sustain_keeps_a_held_note_sustaining() {
+        let mut envelope = Adsr::from_settings(10.0, EnvelopeSettings::new(0.0, 0.0, 0.7, 0.2));
+        envelope.note_on();
+
+        for _ in 0..100 {
+            envelope.next_sample();
+        }
+
+        assert!(!envelope.is_releasing());
+        assert_eq!(envelope.current_level, 0.7);
+    }
+
+    #[test]
+    fn sustain_curvature_shapes_decay_toward_the_end_level() {
+        let settings = |curvature| {
+            EnvelopeSettings::new(0.0, 0.0, 1.0, 0.2)
+                .with_maximum_sustain(1.0)
+                .with_sustain_shape(0.0, curvature)
+        };
+        let mut delayed = Adsr::from_settings(10.0, settings(3.0));
+        let mut linear = Adsr::from_settings(10.0, settings(0.0));
+        let mut accelerated = Adsr::from_settings(10.0, settings(-3.0));
+        for envelope in [&mut delayed, &mut linear, &mut accelerated] {
+            envelope.note_on();
+            envelope.next_sample(); // Attack -> Decay
+            envelope.next_sample(); // Decay -> Sustain
+            for _ in 0..6 {
+                envelope.next_sample();
+            }
+        }
+
+        assert!(delayed.current_level > linear.current_level);
+        assert!((linear.current_level - 0.5).abs() < 1e-6);
+        assert!(accelerated.current_level < linear.current_level);
     }
 }
