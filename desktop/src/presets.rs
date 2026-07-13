@@ -203,8 +203,12 @@ pub struct ReverbPreset {
 pub struct EnvelopePreset {
     #[serde(rename = "@attack_seconds")]
     pub attack_seconds: f32,
+    #[serde(rename = "@attack_curvature", default)]
+    pub attack_curvature: f32,
     #[serde(rename = "@decay_seconds")]
     pub decay_seconds: f32,
+    #[serde(rename = "@decay_curvature", default)]
+    pub decay_curvature: f32,
     #[serde(rename = "@sustain_level")]
     pub sustain_level: f32,
     #[serde(rename = "@release_seconds")]
@@ -221,7 +225,9 @@ impl Default for EnvelopePreset {
     fn default() -> Self {
         Self {
             attack_seconds: 0.1,
+            attack_curvature: 0.0,
             decay_seconds: 0.2,
+            decay_curvature: 0.0,
             sustain_level: 0.7,
             release_seconds: 0.5,
             release_curvature: default_release_curvature(),
@@ -294,7 +300,21 @@ impl Preset {
         }
 
         validate_non_negative(self.envelope.attack_seconds, "attack", &context())?;
+        validate_range(
+            self.envelope.attack_curvature,
+            -10.0,
+            10.0,
+            "attack curvature",
+            &context(),
+        )?;
         validate_non_negative(self.envelope.decay_seconds, "decay", &context())?;
+        validate_range(
+            self.envelope.decay_curvature,
+            -10.0,
+            10.0,
+            "decay curvature",
+            &context(),
+        )?;
         validate_range(self.envelope.sustain_level, 0.0, 1.0, "sustain", &context())?;
         validate_non_negative(self.envelope.release_seconds, "release", &context())?;
         validate_range(
@@ -325,6 +345,8 @@ impl Preset {
                 self.envelope.sustain_level,
                 self.envelope.release_seconds,
             )
+            .with_attack_curvature(self.envelope.attack_curvature)
+            .with_decay_curvature(self.envelope.decay_curvature)
             .with_release_curvature(self.envelope.release_curvature),
         );
 
@@ -474,6 +496,8 @@ mod tests {
         assert!(instruments[0].chorus().is_some());
         assert!(instruments[0].flanger().is_some());
         assert!(instruments[0].reverb().is_some());
+        assert_eq!(bank.presets[0].envelope.attack_curvature, 0.0);
+        assert_eq!(bank.presets[0].envelope.decay_curvature, 0.0);
         assert_eq!(bank.presets[0].envelope.release_curvature, 3.0);
     }
 

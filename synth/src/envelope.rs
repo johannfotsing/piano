@@ -10,7 +10,9 @@ pub enum EnvelopeState {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EnvelopeSettings {
     attack_seconds: f32,
+    attack_curvature: f32,
     decay_seconds: f32,
+    decay_curvature: f32,
     sustain_level: f32,
     release_seconds: f32,
     release_curvature: f32,
@@ -30,15 +32,29 @@ impl EnvelopeSettings {
 
         Self {
             attack_seconds,
+            attack_curvature: 0.0,
             decay_seconds,
+            decay_curvature: 0.0,
             sustain_level,
             release_seconds,
             release_curvature: 3.0,
         }
     }
 
+    pub fn with_attack_curvature(mut self, attack_curvature: f32) -> Self {
+        validate_curvature(attack_curvature);
+        self.attack_curvature = attack_curvature;
+        self
+    }
+
+    pub fn with_decay_curvature(mut self, decay_curvature: f32) -> Self {
+        validate_curvature(decay_curvature);
+        self.decay_curvature = decay_curvature;
+        self
+    }
+
     pub fn with_release_curvature(mut self, release_curvature: f32) -> Self {
-        assert!(release_curvature.is_finite() && (-10.0..=10.0).contains(&release_curvature));
+        validate_curvature(release_curvature);
         self.release_curvature = release_curvature;
         self
     }
@@ -47,8 +63,16 @@ impl EnvelopeSettings {
         self.attack_seconds
     }
 
+    pub const fn attack_curvature(&self) -> f32 {
+        self.attack_curvature
+    }
+
     pub const fn decay_seconds(&self) -> f32 {
         self.decay_seconds
+    }
+
+    pub const fn decay_curvature(&self) -> f32 {
+        self.decay_curvature
     }
 
     pub const fn sustain_level(&self) -> f32 {
@@ -72,10 +96,15 @@ impl Default for EnvelopeSettings {
 
 pub struct Adsr {
     attack_samples: u32,
+    attack_curvature: f32,
+    attack_curve_scale: f32,
     decay_samples: u32,
+    decay_curvature: f32,
+    decay_curve_scale: f32,
     sustain_level: f32,
     release_samples: u32,
     release_curvature: f32,
+    release_curve_scale: f32,
 
     state: EnvelopeState,
 
@@ -86,10 +115,12 @@ pub struct Adsr {
 
 impl Adsr {
     pub fn from_settings(sample_rate: f32, settings: EnvelopeSettings) -> Self {
-        Self::new_with_release_curvature(
+        Self::new_with_curvatures(
             sample_rate,
             settings.attack_seconds(),
+            settings.attack_curvature(),
             settings.decay_seconds(),
+            settings.decay_curvature(),
             settings.sustain_level(),
             settings.release_seconds(),
             settings.release_curvature(),
@@ -121,16 +152,46 @@ impl Adsr {
         release_seconds: f32,
         release_curvature: f32,
     ) -> Self {
-        assert!(release_curvature.is_finite() && (-10.0..=10.0).contains(&release_curvature));
+        Self::new_with_curvatures(
+            sample_rate,
+            attack_seconds,
+            0.0,
+            decay_seconds,
+            0.0,
+            sustain_level,
+            release_seconds,
+            release_curvature,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_curvatures(
+        sample_rate: f32,
+        attack_seconds: f32,
+        attack_curvature: f32,
+        decay_seconds: f32,
+        decay_curvature: f32,
+        sustain_level: f32,
+        release_seconds: f32,
+        release_curvature: f32,
+    ) -> Self {
+        validate_curvature(attack_curvature);
+        validate_curvature(decay_curvature);
+        validate_curvature(release_curvature);
         Self {
             attack_samples: (attack_seconds * sample_rate) as u32,
+            attack_curvature,
+            attack_curve_scale: curve_scale(attack_curvature),
 
             decay_samples: (decay_seconds * sample_rate) as u32,
+            decay_curvature,
+            decay_curve_scale: curve_scale(decay_curvature),
 
             sustain_level,
 
             release_samples: (release_seconds * sample_rate) as u32,
             release_curvature,
+            release_curve_scale: curve_scale(release_curvature),
 
             state: EnvelopeState::Idle,
 
@@ -165,7 +226,9 @@ impl Adsr {
                     self.state = EnvelopeState::Decay;
                     self.sample_counter = 0;
                 } else {
-                    self.current_level = self.sample_counter as f32 / self.attack_samples as f32;
+                    let progress = self.sample_counter as f32 / self.attack_samples as f32;
+                    self.current_level =
+                        curve_progress(progress, self.attack_curvature, self.attack_curve_scale);
 
                     self.sample_counter += 1;
 
@@ -187,7 +250,9 @@ impl Adsr {
                 } else {
                     let progress = self.sample_counter as f32 / self.decay_samples as f32;
 
-                    self.current_level = 1.0 - progress * (1.0 - self.sustain_level);
+                    let curved_progress =
+                        curve_progress(progress, self.decay_curvature, self.decay_curve_scale);
+                    self.current_level = 1.0 - curved_progress * (1.0 - self.sustain_level);
 
                     self.sample_counter += 1;
 
@@ -210,14 +275,12 @@ impl Adsr {
                     self.state = EnvelopeState::Idle;
                 } else {
                     let progress = self.sample_counter as f32 / self.release_samples as f32;
-                    let amplitude = if self.release_curvature.abs() <= f32::EPSILON {
-                        1.0 - progress
-                    } else {
-                        let exponential_progress = (libm::expf(self.release_curvature * progress)
-                            - 1.0)
-                            / (libm::expf(self.release_curvature) - 1.0);
-                        1.0 - exponential_progress
-                    };
+                    let amplitude = 1.0
+                        - curve_progress(
+                            progress,
+                            self.release_curvature,
+                            self.release_curve_scale,
+                        );
                     self.current_level = self.release_start_level * amplitude.max(0.0);
 
                     self.sample_counter += 1;
@@ -240,6 +303,26 @@ impl Adsr {
 
     pub fn is_releasing(&self) -> bool {
         self.state == EnvelopeState::Release
+    }
+}
+
+fn validate_curvature(curvature: f32) {
+    assert!(curvature.is_finite() && (-10.0..=10.0).contains(&curvature));
+}
+
+fn curve_scale(curvature: f32) -> f32 {
+    if curvature.abs() <= f32::EPSILON {
+        0.0
+    } else {
+        libm::expf(curvature) - 1.0
+    }
+}
+
+fn curve_progress(progress: f32, curvature: f32, scale: f32) -> f32 {
+    if curvature.abs() <= f32::EPSILON {
+        progress
+    } else {
+        (libm::expf(curvature * progress) - 1.0) / scale
     }
 }
 
@@ -295,5 +378,37 @@ mod tests {
             envelope.next_sample();
         }
         assert!(envelope.next_sample() < 0.5);
+    }
+
+    #[test]
+    fn attack_curvature_moves_between_concave_and_convex() {
+        let mut convex = Adsr::new_with_curvatures(10.0, 1.0, 3.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        let mut concave = Adsr::new_with_curvatures(10.0, 1.0, -3.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        convex.note_on();
+        concave.note_on();
+        for _ in 0..5 {
+            convex.next_sample();
+            concave.next_sample();
+        }
+
+        assert!(convex.next_sample() < 0.5);
+        assert!(concave.next_sample() > 0.5);
+    }
+
+    #[test]
+    fn decay_curvature_shapes_the_fall_to_sustain() {
+        let mut delayed = Adsr::new_with_curvatures(10.0, 0.0, 0.0, 1.0, 3.0, 0.0, 0.0, 0.0);
+        let mut accelerated = Adsr::new_with_curvatures(10.0, 0.0, 0.0, 1.0, -3.0, 0.0, 0.0, 0.0);
+        delayed.note_on();
+        accelerated.note_on();
+        delayed.next_sample();
+        accelerated.next_sample();
+        for _ in 0..5 {
+            delayed.next_sample();
+            accelerated.next_sample();
+        }
+
+        assert!(delayed.next_sample() > 0.5);
+        assert!(accelerated.next_sample() < 0.5);
     }
 }

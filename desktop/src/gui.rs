@@ -1298,22 +1298,35 @@ impl PresetEditor {
         let attack_end = envelope.attack_seconds;
         let decay_end = attack_end + envelope.decay_seconds;
         let sustain_end = decay_end + sustain_seconds;
-        let mut points = vec![
-            egui::pos2(x_at(0.0), y_at(0.0)),
-            egui::pos2(x_at(attack_end), y_at(1.0)),
-            egui::pos2(x_at(decay_end), y_at(envelope.sustain_level)),
-            egui::pos2(x_at(sustain_end), y_at(envelope.sustain_level)),
-        ];
-        let release_scale = envelope.release_curvature.exp() - 1.0;
+        let curved_progress = |progress: f32, curvature: f32| {
+            if curvature.abs() <= f32::EPSILON {
+                progress
+            } else {
+                ((curvature * progress).exp() - 1.0) / (curvature.exp() - 1.0)
+            }
+        };
+        let mut points = vec![egui::pos2(x_at(0.0), y_at(0.0))];
         for index in 1..=32 {
             let progress = index as f32 / 32.0;
-            let amplitude = if envelope.release_curvature.abs() <= f32::EPSILON {
-                1.0 - progress
-            } else {
-                let exponential_progress =
-                    ((envelope.release_curvature * progress).exp() - 1.0) / release_scale;
-                1.0 - exponential_progress
-            };
+            points.push(egui::pos2(
+                x_at(envelope.attack_seconds * progress),
+                y_at(curved_progress(progress, envelope.attack_curvature)),
+            ));
+        }
+        for index in 1..=32 {
+            let progress = index as f32 / 32.0;
+            let amplitude = 1.0
+                - curved_progress(progress, envelope.decay_curvature)
+                    * (1.0 - envelope.sustain_level);
+            points.push(egui::pos2(
+                x_at(attack_end + envelope.decay_seconds * progress),
+                y_at(amplitude),
+            ));
+        }
+        points.push(egui::pos2(x_at(sustain_end), y_at(envelope.sustain_level)));
+        for index in 1..=32 {
+            let progress = index as f32 / 32.0;
+            let amplitude = 1.0 - curved_progress(progress, envelope.release_curvature);
             points.push(egui::pos2(
                 x_at(sustain_end + envelope.release_seconds * progress),
                 y_at(envelope.sustain_level * amplitude.max(0.0)),
@@ -1344,9 +1357,11 @@ impl PresetEditor {
             );
         }
         response.on_hover_text(format!(
-            "Attack {:.2}s · Decay {:.2}s · Sustain {:.2} · Release {:.2}s · Curvature {:.2}",
+            "Attack {:.2}s / {:.2} · Decay {:.2}s / {:.2} · Sustain {:.2} · Release {:.2}s / {:.2}",
             envelope.attack_seconds,
+            envelope.attack_curvature,
             envelope.decay_seconds,
+            envelope.decay_curvature,
             envelope.sustain_level,
             envelope.release_seconds,
             envelope.release_curvature
@@ -1374,10 +1389,27 @@ impl PresetEditor {
                             );
                             Self::knob_item(
                                 ui,
+                                "Attack curvature",
+                                &mut envelope.attack_curvature,
+                                -10.0..=10.0,
+                                0.02,
+                                2,
+                            );
+                            ui.end_row();
+                            Self::knob_item(
+                                ui,
                                 "Decay (s)",
                                 &mut envelope.decay_seconds,
                                 0.0..=10.0,
                                 0.01,
+                                2,
+                            );
+                            Self::knob_item(
+                                ui,
+                                "Decay curvature",
+                                &mut envelope.decay_curvature,
+                                -10.0..=10.0,
+                                0.02,
                                 2,
                             );
                             ui.end_row();
