@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use serde::{Deserialize, Serialize};
 use synth::{
     Chorus, EnvelopeSettings, FilterMode, FilterSettings, Flanger, Hammer, Instrument,
-    OscillatorAssignment, Reverb, Tremolo, Vibrato, Waveform,
+    OscillatorAssignment, Pluck, Reverb, Tremolo, Vibrato, Waveform,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -23,6 +23,8 @@ pub struct Preset {
     pub oscillators: Vec<OscillatorPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hammer: Option<HammerPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pluck: Option<PluckPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<FilterPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -68,6 +70,18 @@ fn default_partial_decay() -> f32 {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HammerPreset {
+    #[serde(rename = "@gain")]
+    pub gain: f32,
+    #[serde(rename = "@decay_seconds")]
+    pub decay_seconds: f32,
+    #[serde(rename = "@cutoff_hz")]
+    pub cutoff_hz: f32,
+    #[serde(rename = "@velocity_sensitivity")]
+    pub velocity_sensitivity: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PluckPreset {
     #[serde(rename = "@gain")]
     pub gain: f32,
     #[serde(rename = "@decay_seconds")]
@@ -367,6 +381,23 @@ impl Preset {
             ));
         }
 
+        if let Some(pluck) = &self.pluck {
+            validate_non_negative(pluck.gain, "pluck gain", &context())?;
+            validate_positive(pluck.decay_seconds, "pluck decay", &context())?;
+            validate_positive(pluck.cutoff_hz, "pluck cutoff", &context())?;
+            validate_non_negative(
+                pluck.velocity_sensitivity,
+                "pluck velocity sensitivity",
+                &context(),
+            )?;
+            instrument = instrument.with_pluck(Pluck::new(
+                pluck.gain,
+                pluck.decay_seconds,
+                pluck.cutoff_hz,
+                pluck.velocity_sensitivity,
+            ));
+        }
+
         if let Some(filter) = &self.filter {
             validate_positive(filter.cutoff_hz, "filter cutoff", &context())?;
             validate_range(filter.resonance_q, 0.5, 20.0, "filter Q", &context())?;
@@ -469,6 +500,7 @@ mod tests {
             <oscillator waveform="triangle" gain="0.7" frequency_ratio="2.01" detune_cents="1.5" decay_seconds="1.2" velocity_sensitivity="0.8"/>
             <oscillator waveform="sine" gain="0.3"/>
             <hammer gain="0.06" decay_seconds="0.018" cutoff_hz="6000" velocity_sensitivity="1.5"/>
+            <pluck gain="0.12" decay_seconds="0.025" cutoff_hz="6500" velocity_sensitivity="1.1"/>
             <filter mode="lowpass" cutoff_hz="2500" resonance_q="0.707"/>
             <vibrato rate_hz="5" depth_cents="12"/>
             <tremolo rate_hz="4" depth="0.2"/>
@@ -490,6 +522,7 @@ mod tests {
         assert_eq!(instruments[0].oscillators().len(), 2);
         assert_eq!(instruments[0].oscillators()[0].frequency_ratio(), 2.01);
         assert!(instruments[0].hammer().is_some());
+        assert!(instruments[0].pluck().is_some());
         assert!(instruments[0].filter().is_some());
         assert!(instruments[0].vibrato().is_some());
         assert!(instruments[0].tremolo().is_some());

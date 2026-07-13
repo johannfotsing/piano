@@ -21,6 +21,43 @@ pub struct Hammer {
     velocity_sensitivity: f32,
 }
 
+/// Velocity-sensitive, physically modelled plucked string mixed into a voice.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Pluck {
+    gain: f32,
+    decay_seconds: f32,
+    cutoff_hz: f32,
+    velocity_sensitivity: f32,
+}
+
+impl Pluck {
+    pub fn new(gain: f32, decay_seconds: f32, cutoff_hz: f32, velocity_sensitivity: f32) -> Self {
+        assert!(gain.is_finite() && gain >= 0.0);
+        assert!(decay_seconds.is_finite() && decay_seconds > 0.0);
+        assert!(cutoff_hz.is_finite() && cutoff_hz > 0.0);
+        assert!(velocity_sensitivity.is_finite() && velocity_sensitivity >= 0.0);
+        Self {
+            gain,
+            decay_seconds,
+            cutoff_hz,
+            velocity_sensitivity,
+        }
+    }
+
+    pub const fn gain(&self) -> f32 {
+        self.gain
+    }
+    pub const fn decay_seconds(&self) -> f32 {
+        self.decay_seconds
+    }
+    pub const fn cutoff_hz(&self) -> f32 {
+        self.cutoff_hz
+    }
+    pub const fn velocity_sensitivity(&self) -> f32 {
+        self.velocity_sensitivity
+    }
+}
+
 impl Hammer {
     pub fn new(gain: f32, decay_seconds: f32, cutoff_hz: f32, velocity_sensitivity: f32) -> Self {
         assert!(gain.is_finite() && gain >= 0.0);
@@ -271,6 +308,7 @@ pub struct Instrument {
     flanger: Option<Flanger>,
     reverb: Option<Reverb>,
     hammer: Option<Hammer>,
+    pluck: Option<Pluck>,
     filter: Option<FilterSettings>,
     envelope: EnvelopeSettings,
 }
@@ -287,6 +325,7 @@ impl Instrument {
             flanger: None,
             reverb: None,
             hammer: None,
+            pluck: None,
             filter: None,
             envelope: EnvelopeSettings::default(),
         }
@@ -352,6 +391,15 @@ impl Instrument {
 
     pub const fn hammer(&self) -> Option<Hammer> {
         self.hammer
+    }
+
+    pub fn with_pluck(mut self, pluck: Pluck) -> Self {
+        self.pluck = Some(pluck);
+        self
+    }
+
+    pub const fn pluck(&self) -> Option<Pluck> {
+        self.pluck
     }
 
     pub fn with_filter(mut self, filter: FilterSettings) -> Self {
@@ -425,5 +473,20 @@ mod tests {
         assert_eq!(instrument.oscillators()[0].frequency_ratio(), 2.01);
         assert_eq!(instrument.oscillators()[0].decay_seconds(), 1.2);
         assert_eq!(instrument.hammer().unwrap().cutoff_hz(), 6_000.0);
+    }
+
+    #[test]
+    fn adds_a_velocity_sensitive_pluck_to_an_instrument() {
+        let instrument = Instrument::new(
+            "Guitar",
+            vec![OscillatorAssignment::new(Waveform::Sine, 1.0)],
+        )
+        .with_pluck(Pluck::new(0.12, 0.025, 6_500.0, 1.1));
+
+        let pluck = instrument.pluck().unwrap();
+        assert_eq!(pluck.gain(), 0.12);
+        assert_eq!(pluck.decay_seconds(), 0.025);
+        assert_eq!(pluck.cutoff_hz(), 6_500.0);
+        assert_eq!(pluck.velocity_sensitivity(), 1.1);
     }
 }

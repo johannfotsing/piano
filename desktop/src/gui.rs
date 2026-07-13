@@ -12,8 +12,8 @@ use crate::{
     audio::AudioCommand,
     presets::{
         ChorusPreset, EnvelopePreset, FilterModePreset, FilterPreset, FlangerPreset, HammerPreset,
-        OscillatorPreset, Preset, PresetBank, ReverbPreset, TremoloPreset, VibratoPreset,
-        WaveformPreset,
+        OscillatorPreset, PluckPreset, Preset, PresetBank, ReverbPreset, TremoloPreset,
+        VibratoPreset, WaveformPreset,
     },
 };
 
@@ -322,6 +322,7 @@ impl PresetEditor {
                     velocity_sensitivity: 0.0,
                 }],
                 hammer: None,
+                pluck: None,
                 filter: None,
                 vibrato: None,
                 tremolo: None,
@@ -802,6 +803,49 @@ impl PresetEditor {
                         ui.end_row();
                     }
                 }
+
+                Self::show_optional_card(
+                    ui,
+                    "pluck_settings",
+                    "Pluck",
+                    &mut preset.pluck,
+                    PluckPreset {
+                        gain: 0.55,
+                        decay_seconds: 1.8,
+                        cutoff_hz: 4_200.0,
+                        velocity_sensitivity: 0.7,
+                    },
+                    None,
+                    |ui, pluck| {
+                        Self::knob_item(ui, "Gain", &mut pluck.gain, 0.0..=1.0, 0.005, 2);
+                        Self::knob_item(
+                            ui,
+                            "Decay s",
+                            &mut pluck.decay_seconds,
+                            0.05..=10.0,
+                            0.01,
+                            2,
+                        );
+                        ui.end_row();
+                        Self::knob_item(
+                            ui,
+                            "Cutoff Hz",
+                            &mut pluck.cutoff_hz,
+                            100.0..=20_000.0,
+                            50.0,
+                            0,
+                        );
+                        Self::knob_item(
+                            ui,
+                            "Velocity",
+                            &mut pluck.velocity_sensitivity,
+                            0.0..=4.0,
+                            0.02,
+                            2,
+                        );
+                        ui.end_row();
+                    },
+                );
 
                 Self::show_optional_card(
                     ui,

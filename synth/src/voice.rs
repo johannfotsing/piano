@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::f32::consts::TAU;
 
-use crate::{Adsr, Hammer, Instrument, Lfo, LfoWaveform, Oscillator, StateVariableFilter};
+use crate::{Adsr, Hammer, Instrument, Lfo, LfoWaveform, Oscillator, Pluck, StateVariableFilter};
 use music::note::Note;
 
 struct VoiceOscillator {
@@ -44,6 +44,65 @@ impl VoiceHammer {
     }
 }
 
+struct VoicePluck {
+    delay_line: Vec<f32>,
+    index: usize,
+    level: f32,
+    feedback: f32,
+}
+
+impl VoicePluck {
+    fn new(
+        settings: Pluck,
+        velocity: f32,
+        frequency: f32,
+        sample_rate: f32,
+        mut noise_state: u32,
+    ) -> Self {
+        let cutoff_hz = settings.cutoff_hz().clamp(20.0, sample_rate * 0.45);
+        let filter_coefficient = 1.0 - libm::expf(-TAU * cutoff_hz / sample_rate);
+        // The averaging stage contributes roughly half a sample of delay.
+        let delay_samples =
+            libm::roundf(sample_rate / frequency - 0.5).clamp(2.0, 8_192.0) as usize;
+        let mut delay_line = Vec::with_capacity(delay_samples);
+        let mut filtered_noise = 0.0;
+
+        noise_state = noise_state.max(1);
+        for _ in 0..delay_samples {
+            noise_state ^= noise_state << 13;
+            noise_state ^= noise_state >> 17;
+            noise_state ^= noise_state << 5;
+            let noise = noise_state as f32 / u32::MAX as f32 * 2.0 - 1.0;
+            filtered_noise += filter_coefficient * (noise - filtered_noise);
+            delay_line.push(filtered_noise);
+        }
+
+        // Suppress any DC bias in the finite excitation buffer.
+        let mean = delay_line.iter().copied().sum::<f32>() / delay_samples as f32;
+        for sample in &mut delay_line {
+            *sample -= mean;
+        }
+
+        Self {
+            delay_line,
+            index: 0,
+            level: settings.gain() * libm::powf(velocity, settings.velocity_sensitivity()),
+            // Each delay cell is revisited once per period, so this controls
+            // the time-domain decay independently of the note frequency.
+            feedback: libm::expf(-1.0 / (settings.decay_seconds() * frequency)),
+        }
+    }
+
+    fn next_sample(&mut self) -> f32 {
+        let current = self.delay_line[self.index];
+        let next_index = (self.index + 1) % self.delay_line.len();
+        let averaged = 0.5 * (current + self.delay_line[next_index]);
+        self.delay_line[self.index] = averaged * self.feedback;
+        self.index = next_index;
+        current * self.level
+    }
+}
+
 struct VoiceVibrato {
     lfo: Lfo,
     depth_cents: f32,
@@ -61,6 +120,7 @@ pub struct Voice {
     vibrato: Option<VoiceVibrato>,
     tremolo: Option<VoiceTremolo>,
     hammer: Option<VoiceHammer>,
+    pluck: Option<VoicePluck>,
 
     note: Note,
     base_frequency: f32,
@@ -116,6 +176,17 @@ impl Voice {
                     .wrapping_add(1),
             )
         });
+        let pluck = instrument.pluck().map(|settings| {
+            VoicePluck::new(
+                settings,
+                normalized_velocity,
+                base_frequency,
+                sample_rate,
+                (note.midi_number() as u32)
+                    .wrapping_mul(2_246_822_519)
+                    .wrapping_add(17),
+            )
+        });
 
         Self {
             oscillators,
@@ -124,6 +195,7 @@ impl Voice {
             vibrato,
             tremolo,
             hammer,
+            pluck,
             note,
             base_frequency,
             velocity: libm::powf(normalized_velocity, 2.0),
@@ -161,6 +233,9 @@ impl Voice {
         if let Some(hammer) = &mut self.hammer {
             oscillator_mix += hammer.next_sample();
         }
+        if let Some(pluck) = &mut self.pluck {
+            oscillator_mix += pluck.next_sample();
+        }
         let filtered_sample = self
             .filter
             .as_mut()
@@ -189,7 +264,7 @@ impl Voice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{OscillatorAssignment, Waveform};
+    use crate::{OscillatorAssignment, Pluck, Waveform};
     use alloc::vec;
 
     #[test]
@@ -203,5 +278,25 @@ mod tests {
         assert!((voice.oscillators[0].oscillator.frequency() - 880.0).abs() < 0.01);
         voice.next_sample();
         assert!(voice.oscillators[0].decay_level < 1.0);
+    }
+
+    #[test]
+    fn creates_and_decays_a_pluck_excitation() {
+        let instrument = Instrument::new(
+            "Plucked",
+            vec![OscillatorAssignment::new(Waveform::Sine, 1.0)],
+        )
+        .with_pluck(Pluck::new(0.12, 0.025, 6_500.0, 1.1));
+        let mut voice = Voice::new(Note::A4, 127, 44_100.0, &instrument);
+        let initial_level = voice.pluck.as_ref().unwrap().level;
+        let initial_sample = voice.pluck.as_mut().unwrap().next_sample();
+
+        for _ in 0..44_100 {
+            voice.pluck.as_mut().unwrap().next_sample();
+        }
+        let final_sample = voice.pluck.as_mut().unwrap().next_sample();
+
+        assert_ne!(initial_sample, 0.0);
+        assert!(final_sample.abs() < initial_level);
     }
 }

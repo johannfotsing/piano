@@ -16,7 +16,7 @@ pub use effects::{ChorusProcessor, FlangerProcessor, ReverbProcessor};
 pub use envelope::{Adsr, EnvelopeSettings};
 pub use filter::{FilterMode, FilterSettings, StateVariableFilter};
 pub use instrument::{
-    Chorus, Flanger, Hammer, Instrument, OscillatorAssignment, Reverb, Tremolo, Vibrato,
+    Chorus, Flanger, Hammer, Instrument, OscillatorAssignment, Pluck, Reverb, Tremolo, Vibrato,
 };
 pub use lfo::{Lfo, LfoWaveform};
 pub use oscillator::{Oscillator, Waveform};
