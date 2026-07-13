@@ -1,4 +1,8 @@
+#![cfg_attr(not(feature = "desktop-input"), no_std)]
+
 use music::{event::NoteEvent, note::Note};
+
+pub mod usb;
 
 #[cfg(feature = "desktop-input")]
 use std::{error::Error, sync::mpsc::Sender};

@@ -245,7 +245,7 @@ Boundary design: see [`NO_STD.md`](NO_STD.md).
 - [x] Make `synth` use `core` + `alloc`
 - [x] Remove platform adapter dependencies from `engine`
 - [x] Make `engine` use `core` + `alloc`
-- [ ] Add an STM32 target-specific build check
+- [x] Add an STM32H747 Cortex-M7 target-specific build check
 
 Desktop still works.
 
@@ -254,6 +254,18 @@ This is a significant milestone because it proves your core logic is portable.
 Phase 11 – STM32
 
 Port the desktop application.
+
+Initial target: STM32H747I-DISCO. Bring up the Cortex-M7 first and reserve the
+Cortex-M4 for later control/UI work.
+
+- [x] Select the STM32H747 M7 HAL/PAC and memory map
+- [ ] Configure power, clocks, caches, and a diagnostic LED/log channel
+- [ ] Add a fixed-capacity allocator for the engine's `alloc` requirements
+- [ ] Configure the board audio codec over I2C
+- [ ] Stream silent stereo buffers over SAI using DMA
+- [ ] Render the engine into DMA buffers without allocating in the audio path
+- [ ] Add MIDI and physical controls
+- [ ] Decide and document the Cortex-M4 role and inter-core protocol
 
 Replace:
 

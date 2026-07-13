@@ -2,9 +2,12 @@
 name = "stm32"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [dependencies]
 engine = { path = "../engine" }
+midi = { path = "../midi" }
+music = { path = "../music" }
 
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
@@ -12,5 +15,6 @@ cortex-m-rt = "0.7"
 panic-halt = "1"
 
 embedded-hal = "1"
+embedded-alloc = "0.6"
 
-stm32f4xx-hal = { version = "0.23", features = ["stm32f446"] }
+stm32h7xx-hal = { version = "0.16", default-features = false, features = ["stm32h747cm7", "rt"] }

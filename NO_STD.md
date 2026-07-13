@@ -47,5 +47,12 @@ Host integration is checked separately from the embedded binary:
 cargo check --workspace --exclude stm32
 ```
 
-The STM32 target requires its own target-specific build and panic strategy; it
-must not be validated as a normal host binary.
+The STM32H747 Cortex-M7 target is checked from the workspace root with:
+
+```sh
+rustup target add thumbv7em-none-eabihf
+cargo stm32-check
+```
+
+Build an optimized firmware image with `cargo stm32-build`. The target-specific
+runner expects `probe-rs` and an attached STM32H747I-DISCO board.

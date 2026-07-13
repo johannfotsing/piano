@@ -1,0 +1,7 @@
+[target.thumbv7em-none-eabihf]
+rustflags = ["-C", "link-arg=-Tmemory.x"]
+runner = "probe-rs run --chip STM32H747XIHx"
+
+[alias]
+stm32-check = "check -p stm32 --target thumbv7em-none-eabihf"
+stm32-build = "build -p stm32 --release --target thumbv7em-none-eabihf"

@@ -88,12 +88,20 @@ impl App {
         self.synthesizer.next_sample()
     }
 
+    pub fn set_master_gain(&mut self, gain: f32) {
+        self.synthesizer.set_master_gain(gain);
+    }
+
     pub fn instruments(&self) -> &[Instrument] {
         &self.instruments
     }
 
     pub fn selected_instrument(&self) -> &Instrument {
         &self.instruments[self.selected_instrument]
+    }
+
+    pub const fn selected_instrument_index(&self) -> usize {
+        self.selected_instrument
     }
 
     /// Selects the instrument used by subsequently created voices.
