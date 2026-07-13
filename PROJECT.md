@@ -132,7 +132,7 @@ A + D + G
 
 plays a chord.
 
-### Milestone: Three-note chords work.
+### Milestone: Three-note chords work
 
 ## Phase 6 – ADSR
 
