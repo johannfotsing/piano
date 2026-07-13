@@ -1420,225 +1420,297 @@ impl eframe::App for PresetEditor {
         self.handle_computer_keyboard(root.ctx());
 
         egui::CentralPanel::default().show(root, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("OpenRSynth");
-                if ui.button("Reload XML").clicked() {
-                    self.reload();
-                }
-                if ui.button("Apply").clicked() {
-                    self.apply();
-                }
-                if ui.button("Save XML").clicked() {
-                    self.save();
-                }
-                if ui.button("MIDI Input").clicked() {
-                    self.show_midi_setup = true;
-                }
-                ui.separator();
-                ui.label(&self.status);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label(egui::RichText::new("Master volume").size(11.0));
-                        if Self::knob(ui, &mut self.master_gain, 0.0..=1.0, 0.005, 2).changed()
-                            && self
-                                .command_sender
-                                .send(AudioCommand::SetMasterGain(self.master_gain))
-                                .is_err()
-                        {
-                            self.status = "Audio thread is unavailable".into();
-                        }
-                    });
+            egui::MenuBar::new().ui(ui, |ui| {
+                ui.menu_button("Actions ▾", |ui| {
+                    if ui.button("Reload XML").clicked() {
+                        self.reload();
+                        ui.close();
+                    }
+                    if ui.button("Apply").clicked() {
+                        self.apply();
+                        ui.close();
+                    }
+                    if ui.button("Save XML").clicked() {
+                        self.save();
+                        ui.close();
+                    }
+                    ui.separator();
+                    if ui.button("MIDI Input").clicked() {
+                        self.show_midi_setup = true;
+                        ui.close();
+                    }
                 });
             });
             ui.separator();
 
-            ui.horizontal_top(|ui| {
-                egui::Resize::default()
-                    .id_salt("preset_column_resize")
-                    .default_width(210.0)
-                    .min_width(160.0)
-                    .max_width(420.0)
-                    .resizable([true, false])
-                    .with_stroke(false)
-                    .show(ui, |ui| {
+            let workspace_rect = ui.available_rect_before_wrap();
+            ui.scope_builder(
+                egui::UiBuilder::new()
+                    .max_rect(workspace_rect)
+                    .layout(egui::Layout::top_down(egui::Align::Min)),
+                |ui| {
+                    ui.set_clip_rect(workspace_rect);
+                    ui.horizontal_top(|ui| {
                         ui.vertical(|ui| {
-                            ui.heading("Presets");
-                            ui.horizontal(|ui| {
-                                if ui.button("＋ Add").clicked() {
-                                    self.add_preset();
-                                }
-                                if ui
-                                    .add_enabled(
-                                        self.bank.presets.len() > 1,
-                                        egui::Button::new("🗑 Delete"),
-                                    )
-                                    .on_hover_text("Delete selected preset")
-                                    .clicked()
-                                {
-                                    self.pending_preset_deletion = Some(self.selected);
-                                }
+                            ui.heading("OpenRSynth");
+                            ui.label(&self.status);
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                            egui::Frame::group(ui.style()).show(ui, |ui| {
+                                ui.set_width(92.0);
+                                ui.vertical_centered(|ui| {
+                                    ui.strong("Master volume");
+                                    if Self::knob(ui, &mut self.master_gain, 0.0..=1.0, 0.005, 2)
+                                        .changed()
+                                        && self
+                                            .command_sender
+                                            .send(AudioCommand::SetMasterGain(self.master_gain))
+                                            .is_err()
+                                    {
+                                        self.status = "Audio thread is unavailable".into();
+                                    }
+                                });
                             });
-                            ui.add_space(6.0);
 
-                            let mut groups: BTreeMap<String, Vec<(usize, String)>> =
-                                BTreeMap::new();
-                            for (index, preset) in self.bank.presets.iter().enumerate() {
-                                let group = if preset.group.trim().is_empty() {
-                                    "Ungrouped".to_string()
-                                } else {
-                                    preset.group.clone()
-                                };
-                                groups
-                                    .entry(group)
-                                    .or_default()
-                                    .push((index, preset.name.clone()));
-                            }
-                            for (group, presets) in groups {
-                                egui::CollapsingHeader::new(group).default_open(true).show(
-                                    ui,
-                                    |ui| {
-                                        for (index, name) in presets {
-                                            if ui
-                                                .selectable_label(index == self.selected, name)
-                                                .clicked()
-                                            {
-                                                self.select_preset(index);
-                                            }
-                                        }
-                                    },
-                                );
+                            if let Some(preset) = self.bank.presets.get_mut(self.selected) {
+                                egui::Frame::group(ui.style()).show(ui, |ui| {
+                                    ui.set_width(350.0);
+                                    ui.set_min_height(92.0);
+                                    ui.vertical(|ui| {
+                                        ui.strong("Instrument");
+                                        ui.add_space(5.0);
+                                        ui.horizontal(|ui| {
+                                            ui.vertical(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new("Preset name").size(11.0),
+                                                );
+                                                ui.add_sized(
+                                                    [180.0, 24.0],
+                                                    egui::TextEdit::singleline(&mut preset.name),
+                                                );
+                                            });
+                                            ui.vertical(|ui| {
+                                                ui.label(egui::RichText::new("Group").size(11.0));
+                                                ui.add_sized(
+                                                    [140.0, 24.0],
+                                                    egui::TextEdit::singleline(&mut preset.group),
+                                                );
+                                            });
+                                        });
+                                    });
+                                });
                             }
                         });
                     });
+                    ui.separator();
 
-                ui.separator();
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    if let Some(preset) = self.bank.presets.get_mut(self.selected) {
-                        ui.vertical(|ui| {
-                            ui.label("Preset name");
-                            ui.text_edit_singleline(&mut preset.name);
-                            ui.label("Group");
-                            ui.text_edit_singleline(&mut preset.group);
-                            ui.separator();
-
-                            let available_width = ui.available_width();
-                            let splitter_width = 10.0;
-                            let output_width_id = ui.make_persistent_id("output_column_width");
-                            let automatic_output_width = 640.0_f32
-                                .min((available_width - 260.0 - splitter_width).max(280.0));
-                            let output_width = ui
-                                .ctx()
-                                .data_mut(|data| data.get_persisted::<f32>(output_width_id))
-                                .unwrap_or(automatic_output_width)
-                                .clamp(
-                                    280.0,
-                                    (available_width - 260.0 - splitter_width).max(280.0),
-                                );
-                            let synthesis_width =
-                                (available_width - output_width - splitter_width).max(260.0);
-                            ui.horizontal_top(|ui| {
-                                Self::surface(
-                                    ui,
-                                    egui::Color32::from_rgb(20, 27, 36),
-                                    egui::Color32::from_rgb(238, 244, 249),
-                                    |ui| {
-                                        ui.set_width((synthesis_width - 12.0).max(248.0));
-                                        ui.vertical(|ui| {
-                                            ui.heading("Synthesis");
-                                            ui.separator();
-                                            Self::surface(
-                                                ui,
-                                                egui::Color32::from_rgb(27, 36, 47),
-                                                egui::Color32::from_rgb(247, 250, 253),
-                                                |ui| {
-                                                    ui.set_min_width(ui.available_width());
-                                                    Self::show_oscillators(ui, preset);
-                                                },
-                                            );
-                                            ui.separator();
-                                            Self::surface(
-                                                ui,
-                                                egui::Color32::from_rgb(31, 30, 43),
-                                                egui::Color32::from_rgb(250, 247, 252),
-                                                |ui| {
-                                                    ui.set_min_width(ui.available_width());
-                                                    Self::show_effects(
-                                                        ui,
-                                                        &mut preset.vibrato,
-                                                        &mut preset.tremolo,
-                                                        &mut preset.chorus,
-                                                        &mut preset.flanger,
-                                                        &mut preset.reverb,
-                                                    );
-                                                },
-                                            );
-                                        });
-                                    },
-                                );
-
-                                let splitter = ui
-                                    .add(
-                                        egui::Separator::default()
-                                            .vertical()
-                                            .spacing(splitter_width),
-                                    )
-                                    .interact(egui::Sense::drag());
-                                if splitter.hovered() || splitter.dragged() {
-                                    ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
-                                }
-                                let drag_start_id = splitter.id.with("output_width_drag_start");
-                                if splitter.drag_started() {
-                                    ui.ctx().data_mut(|data| {
-                                        data.insert_temp(drag_start_id, output_width)
+                    ui.horizontal_top(|ui| {
+                        egui::Resize::default()
+                            .id_salt("preset_column_resize")
+                            .default_width(210.0)
+                            .min_width(160.0)
+                            .max_width(420.0)
+                            .resizable([true, false])
+                            .with_stroke(false)
+                            .show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    ui.heading("Presets");
+                                    ui.horizontal(|ui| {
+                                        if ui.button("＋ Add").clicked() {
+                                            self.add_preset();
+                                        }
+                                        if ui
+                                            .add_enabled(
+                                                self.bank.presets.len() > 1,
+                                                egui::Button::new("🗑 Delete"),
+                                            )
+                                            .on_hover_text("Delete selected preset")
+                                            .clicked()
+                                        {
+                                            self.pending_preset_deletion = Some(self.selected);
+                                        }
                                     });
-                                }
-                                if splitter.dragged() {
-                                    let drag_start = ui
+                                    ui.add_space(6.0);
+
+                                    let mut groups: BTreeMap<String, Vec<(usize, String)>> =
+                                        BTreeMap::new();
+                                    for (index, preset) in self.bank.presets.iter().enumerate() {
+                                        let group = if preset.group.trim().is_empty() {
+                                            "Ungrouped".to_string()
+                                        } else {
+                                            preset.group.clone()
+                                        };
+                                        groups
+                                            .entry(group)
+                                            .or_default()
+                                            .push((index, preset.name.clone()));
+                                    }
+                                    for (group, presets) in groups {
+                                        egui::CollapsingHeader::new(group).default_open(true).show(
+                                            ui,
+                                            |ui| {
+                                                for (index, name) in presets {
+                                                    if ui
+                                                        .selectable_label(
+                                                            index == self.selected,
+                                                            name,
+                                                        )
+                                                        .clicked()
+                                                    {
+                                                        self.select_preset(index);
+                                                    }
+                                                }
+                                            },
+                                        );
+                                    }
+                                });
+                            });
+
+                        ui.separator();
+
+                        egui::ScrollArea::vertical().show(ui, |ui| {
+                            if let Some(preset) = self.bank.presets.get_mut(self.selected) {
+                                ui.vertical(|ui| {
+                                    let available_width = ui.available_width();
+                                    let splitter_width = 10.0;
+                                    let output_width_id =
+                                        ui.make_persistent_id("output_column_width");
+                                    let automatic_output_width = 640.0_f32
+                                        .min((available_width - 260.0 - splitter_width).max(280.0));
+                                    let output_width = ui
                                         .ctx()
-                                        .data_mut(|data| data.get_temp::<f32>(drag_start_id))
-                                        .unwrap_or(output_width);
-                                    let resized_output = (drag_start - splitter.drag_delta().x)
+                                        .data_mut(|data| data.get_persisted::<f32>(output_width_id))
+                                        .unwrap_or(automatic_output_width)
                                         .clamp(
                                             280.0,
                                             (available_width - 260.0 - splitter_width).max(280.0),
                                         );
-                                    ui.ctx().data_mut(|data| {
-                                        data.insert_persisted(output_width_id, resized_output)
-                                    });
-                                    ui.ctx().request_repaint();
-                                }
+                                    let synthesis_width =
+                                        (available_width - output_width - splitter_width)
+                                            .max(260.0);
+                                    ui.horizontal_top(|ui| {
+                                        Self::surface(
+                                            ui,
+                                            egui::Color32::from_rgb(20, 27, 36),
+                                            egui::Color32::from_rgb(238, 244, 249),
+                                            |ui| {
+                                                ui.set_width((synthesis_width - 12.0).max(248.0));
+                                                ui.vertical(|ui| {
+                                                    ui.heading("Synthesis");
+                                                    ui.separator();
+                                                    Self::surface(
+                                                        ui,
+                                                        egui::Color32::from_rgb(27, 36, 47),
+                                                        egui::Color32::from_rgb(247, 250, 253),
+                                                        |ui| {
+                                                            ui.set_min_width(ui.available_width());
+                                                            Self::show_oscillators(ui, preset);
+                                                        },
+                                                    );
+                                                    ui.separator();
+                                                    Self::surface(
+                                                        ui,
+                                                        egui::Color32::from_rgb(31, 30, 43),
+                                                        egui::Color32::from_rgb(250, 247, 252),
+                                                        |ui| {
+                                                            ui.set_min_width(ui.available_width());
+                                                            Self::show_effects(
+                                                                ui,
+                                                                &mut preset.vibrato,
+                                                                &mut preset.tremolo,
+                                                                &mut preset.chorus,
+                                                                &mut preset.flanger,
+                                                                &mut preset.reverb,
+                                                            );
+                                                        },
+                                                    );
+                                                });
+                                            },
+                                        );
 
-                                Self::surface(
-                                    ui,
-                                    egui::Color32::from_rgb(29, 25, 35),
-                                    egui::Color32::from_rgb(247, 242, 249),
-                                    |ui| {
-                                        ui.set_width((output_width - 12.0).max(268.0));
-                                        ui.vertical(|ui| {
-                                            ui.heading("Output");
-                                            ui.separator();
-                                            Self::surface(
-                                                ui,
-                                                egui::Color32::from_rgb(38, 30, 31),
-                                                egui::Color32::from_rgb(252, 246, 244),
-                                                |ui| Self::show_filter(ui, &mut preset.filter),
+                                        let splitter = ui
+                                            .add(
+                                                egui::Separator::default()
+                                                    .vertical()
+                                                    .spacing(splitter_width),
+                                            )
+                                            .interact(egui::Sense::drag());
+                                        if splitter.hovered() || splitter.dragged() {
+                                            ui.ctx().set_cursor_icon(
+                                                egui::CursorIcon::ResizeHorizontal,
                                             );
-                                            ui.separator();
-                                            Self::surface(
-                                                ui,
-                                                egui::Color32::from_rgb(29, 37, 33),
-                                                egui::Color32::from_rgb(244, 250, 246),
-                                                |ui| Self::show_envelope(ui, &mut preset.envelope),
-                                            );
-                                        });
-                                    },
-                                );
-                            });
+                                        }
+                                        let drag_start_id =
+                                            splitter.id.with("output_width_drag_start");
+                                        if splitter.drag_started() {
+                                            ui.ctx().data_mut(|data| {
+                                                data.insert_temp(drag_start_id, output_width)
+                                            });
+                                        }
+                                        if splitter.dragged() {
+                                            let drag_start = ui
+                                                .ctx()
+                                                .data_mut(|data| {
+                                                    data.get_temp::<f32>(drag_start_id)
+                                                })
+                                                .unwrap_or(output_width);
+                                            let resized_output =
+                                                (drag_start - splitter.drag_delta().x).clamp(
+                                                    280.0,
+                                                    (available_width - 260.0 - splitter_width)
+                                                        .max(280.0),
+                                                );
+                                            ui.ctx().data_mut(|data| {
+                                                data.insert_persisted(
+                                                    output_width_id,
+                                                    resized_output,
+                                                )
+                                            });
+                                            ui.ctx().request_repaint();
+                                        }
+
+                                        Self::surface(
+                                            ui,
+                                            egui::Color32::from_rgb(29, 25, 35),
+                                            egui::Color32::from_rgb(247, 242, 249),
+                                            |ui| {
+                                                ui.set_width((output_width - 12.0).max(268.0));
+                                                ui.vertical(|ui| {
+                                                    ui.heading("Output");
+                                                    ui.separator();
+                                                    Self::surface(
+                                                        ui,
+                                                        egui::Color32::from_rgb(38, 30, 31),
+                                                        egui::Color32::from_rgb(252, 246, 244),
+                                                        |ui| {
+                                                            Self::show_filter(
+                                                                ui,
+                                                                &mut preset.filter,
+                                                            )
+                                                        },
+                                                    );
+                                                    ui.separator();
+                                                    Self::surface(
+                                                        ui,
+                                                        egui::Color32::from_rgb(29, 37, 33),
+                                                        egui::Color32::from_rgb(244, 250, 246),
+                                                        |ui| {
+                                                            Self::show_envelope(
+                                                                ui,
+                                                                &mut preset.envelope,
+                                                            )
+                                                        },
+                                                    );
+                                                });
+                                            },
+                                        );
+                                    });
+                                });
+                            }
                         });
-                    }
-                });
-            });
+                    });
+                },
+            );
         });
 
         if self.bank != self.last_applied_bank {
