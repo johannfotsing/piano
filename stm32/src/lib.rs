@@ -1,7 +1,8 @@
 #![no_std]
 
 pub mod audio;
+pub mod board;
+pub mod control;
 pub mod display;
-pub mod gpio;
-pub mod hardware_engine;
+pub mod mbed_engine;
 pub mod midi;

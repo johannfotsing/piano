@@ -6,6 +6,7 @@ pub enum AudioCommand {
     Note(NoteEvent),
     SelectInstrument(usize),
     SetMasterGain(f32),
+    Reset,
 }
 
 /// Codec/SAI boundary implemented by the STM32H747 board support layer.
@@ -119,6 +120,10 @@ where
                     self.app.select_instrument(index);
                 }
                 AudioCommand::SetMasterGain(gain) => self.app.set_master_gain(gain),
+                AudioCommand::Reset => {
+                    self.app.select_instrument(0);
+                    self.app.set_master_gain(0.2);
+                }
             }
         }
 

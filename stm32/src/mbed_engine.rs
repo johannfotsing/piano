@@ -2,14 +2,15 @@ use music::event::NoteEvent;
 
 use crate::{
     audio::{AudioCommand, AudioModule, AudioOutput},
+    control::GpioEvent,
     display::{Display, DisplayCommand, DisplayItem, DisplayTarget, WindowGui},
-    gpio::GpioEvent,
     midi::{UsbMidiEndpoint, UsbMidiInput},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InputError {
+pub enum InputError<E> {
     AudioQueueFull,
+    Audio(E),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,13 +20,13 @@ pub enum MidiError<E> {
 }
 
 /// Top-level coordinator for the STM32 application.
-pub struct HardwareEngine<O, D, const BUFFER_SAMPLES: usize, const COMMAND_CAPACITY: usize> {
+pub struct MbedEngine<O, D, const BUFFER_SAMPLES: usize, const COMMAND_CAPACITY: usize> {
     audio: AudioModule<O, BUFFER_SAMPLES, COMMAND_CAPACITY>,
     display: Display<D>,
 }
 
 impl<O, D, const BUFFER_SAMPLES: usize, const COMMAND_CAPACITY: usize>
-    HardwareEngine<O, D, BUFFER_SAMPLES, COMMAND_CAPACITY>
+    MbedEngine<O, D, BUFFER_SAMPLES, COMMAND_CAPACITY>
 where
     O: AudioOutput,
     D: DisplayTarget,
@@ -49,7 +50,7 @@ where
         self.audio.stop()
     }
 
-    pub fn process_gpio_event(&mut self, event: GpioEvent) -> Result<(), InputError> {
+    pub fn process_gpio_event(&mut self, event: GpioEvent) -> Result<(), InputError<O::Error>> {
         match event {
             GpioEvent::Up if !self.display.window().editing => {
                 let item = self.display.window().selected_item.previous();
@@ -61,6 +62,22 @@ where
             }
             GpioEvent::In => self.display.send(DisplayCommand::SetEditing(true)),
             GpioEvent::Out => self.display.send(DisplayCommand::SetEditing(false)),
+            GpioEvent::Select => {
+                let editing = !self.display.window().editing;
+                self.display.send(DisplayCommand::SetEditing(editing));
+            }
+            GpioEvent::On => self.audio.start().map_err(InputError::Audio)?,
+            GpioEvent::Off => self.audio.stop().map_err(InputError::Audio)?,
+            GpioEvent::Reset => {
+                self.audio
+                    .enqueue(AudioCommand::Reset)
+                    .map_err(|_| InputError::AudioQueueFull)?;
+                self.display
+                    .send(DisplayCommand::Select(DisplayItem::Instrument));
+                self.display.send(DisplayCommand::SetEditing(false));
+                self.display.send(DisplayCommand::SetInstrument(0));
+                self.display.send(DisplayCommand::SetMasterGain(20));
+            }
             GpioEvent::KnobIncrement(delta) if self.display.window().editing => {
                 self.process_knob(delta)?;
             }
@@ -69,7 +86,10 @@ where
         Ok(())
     }
 
-    pub fn process_note_event(&mut self, event: NoteEvent) -> Result<(), InputError> {
+    pub fn process_note_event(
+        &mut self,
+        event: NoteEvent,
+    ) -> Result<(), InputError<core::convert::Infallible>> {
         self.audio
             .enqueue(AudioCommand::Note(event))
             .map_err(|_| InputError::AudioQueueFull)
@@ -102,7 +122,11 @@ where
         self.display.window()
     }
 
-    fn process_knob(&mut self, delta: i16) -> Result<(), InputError> {
+    pub const fn audio_is_running(&self) -> bool {
+        self.audio.is_running()
+    }
+
+    fn process_knob(&mut self, delta: i16) -> Result<(), InputError<O::Error>> {
         match self.display.window().selected_item {
             DisplayItem::Instrument => {
                 let current = self.display.window().selected_instrument as i32;
@@ -162,7 +186,7 @@ mod tests {
         }
     }
 
-    fn hardware_engine() -> HardwareEngine<Output, Target, 8, 8> {
+    fn mbed_engine() -> MbedEngine<Output, Target, 8, 8> {
         let app = App::new(
             Synthesizer::new(48_000.0),
             vec![
@@ -170,12 +194,12 @@ mod tests {
                 Instrument::new("Two", vec![OscillatorAssignment::new(Waveform::Sine, 1.0)]),
             ],
         );
-        HardwareEngine::new(AudioModule::new(app, Output), Target)
+        MbedEngine::new(AudioModule::new(app, Output), Target)
     }
 
     #[test]
     fn gpio_navigation_updates_display_and_audio_settings() {
-        let mut hardware = hardware_engine();
+        let mut hardware = mbed_engine();
         hardware.process_gpio_event(GpioEvent::In).unwrap();
         hardware
             .process_gpio_event(GpioEvent::KnobIncrement(1))
@@ -190,6 +214,24 @@ mod tests {
             .unwrap();
         assert_eq!(hardware.window().master_gain_percent, 35);
 
+        hardware.service_audio().unwrap();
+    }
+
+    #[test]
+    fn power_and_reset_events_control_the_embedded_application() {
+        let mut hardware = mbed_engine();
+
+        hardware.process_gpio_event(GpioEvent::On).unwrap();
+        assert!(hardware.audio_is_running());
+        hardware.process_gpio_event(GpioEvent::Off).unwrap();
+        assert!(!hardware.audio_is_running());
+
+        hardware.process_gpio_event(GpioEvent::In).unwrap();
+        hardware
+            .process_gpio_event(GpioEvent::KnobIncrement(1))
+            .unwrap();
+        hardware.process_gpio_event(GpioEvent::Reset).unwrap();
+        assert_eq!(hardware.window(), &WindowGui::default());
         hardware.service_audio().unwrap();
     }
 }
