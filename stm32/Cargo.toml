@@ -8,6 +8,7 @@ build = "build.rs"
 engine = { path = "../engine" }
 midi = { path = "../midi" }
 music = { path = "../music" }
+synth = { path = "../synth" }
 
 cortex-m = "0.7"
 cortex-m-rt = "0.7"

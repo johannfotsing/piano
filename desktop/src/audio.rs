@@ -37,6 +37,10 @@ pub fn start_audio(
             device.build_output_stream(
                 config,
                 move |buffer: &mut [f32], _| {
+                    // At every audio callback, we first handle all pending events and commands, then generate the next audio samples.
+                    // MIDI events are handled first to ensure that the synthesizer state is updated before generating audio samples.
+                    // GUI events are handled after MIDI events to ensure that the synthesizer state is updated before generating audio samples.
+
                     //
                     // Handle every pending event
                     //

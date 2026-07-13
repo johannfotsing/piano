@@ -260,7 +260,7 @@ Cortex-M4 for later control/UI work.
 
 - [x] Select the STM32H747 M7 HAL/PAC and memory map
 - [ ] Configure power, clocks, caches, and a diagnostic LED/log channel
-- [ ] Add a fixed-capacity allocator for the engine's `alloc` requirements
+- [x] Add a fixed-capacity allocator for the engine's `alloc` requirements
 - [ ] Configure the board audio codec over I2C
 - [ ] Stream silent stereo buffers over SAI using DMA
 - [ ] Render the engine into DMA buffers without allocating in the audio path

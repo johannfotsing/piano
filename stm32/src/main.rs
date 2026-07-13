@@ -9,10 +9,6 @@ use panic_halt as _;
 use cortex_m_rt::entry;
 use stm32h7xx_hal as hal;
 
-mod control;
-mod gpio;
-mod midi;
-
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
 

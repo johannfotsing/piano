@@ -3425,6 +3425,7 @@ dependencies = [
  "music",
  "panic-halt",
  "stm32h7xx-hal",
+ "synth",
 ]
 
 [[package]]
