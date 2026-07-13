@@ -1,8 +1,34 @@
 use embedded_hal::digital::InputPin;
+use stm32h7xx_hal::{
+    i2c::{I2c, I2cExt},
+    pac,
+    prelude::*,
+    rcc::{CoreClocks, rec},
+};
 
 use crate::control::{Button, GpioHardware};
 
 const BUTTON_COUNT: usize = 7;
+
+pub type AudioControlI2c = I2c<pac::I2C4>;
+
+/// Configure the board's WM8994 control bus on I2C4.
+///
+/// The STM32H747I-DISCO connects SCL to PD12 and SDA to PD13. Both pins use
+/// alternate function 4 in open-drain mode; the codec itself is addressed by
+/// [`crate::codec::I2C_ADDRESS`].
+pub fn configure_audio_control_i2c(
+    i2c4: pac::I2C4,
+    gpiod: pac::GPIOD,
+    gpiod_rec: rec::Gpiod,
+    i2c4_rec: rec::I2c4,
+    clocks: &CoreClocks,
+) -> AudioControlI2c {
+    let gpiod = gpiod.split(gpiod_rec);
+    let scl = gpiod.pd12.into_alternate().set_open_drain();
+    let sda = gpiod.pd13.into_alternate().set_open_drain();
+    i2c4.i2c((scl, sda), 100.kHz(), i2c4_rec, clocks)
+}
 
 /// GPIO pin collection for the OpenRSynth control panel.
 ///

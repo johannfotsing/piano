@@ -7,7 +7,10 @@ use embedded_alloc::LlffHeap as Heap;
 use panic_halt as _;
 
 use cortex_m_rt::entry;
+use hal::prelude::*;
 use stm32h7xx_hal as hal;
+
+use stm32::{board::configure_audio_control_i2c, codec::Wm8994};
 
 #[global_allocator]
 static HEAP: Heap = Heap::empty();
@@ -23,10 +26,37 @@ fn main() -> ! {
         HEAP.init(core::ptr::addr_of_mut!(HEAP_MEMORY) as usize, HEAP_SIZE);
     }
 
-    // The M7 is the only active application core during initial bring-up. Taking
-    // the device peripherals also proves that this binary was compiled for the
-    // STM32H747 M7 PAC rather than the previous STM32F4 target.
-    let _device = hal::pac::Peripherals::take().unwrap();
+    let core = cortex_m::Peripherals::take().unwrap();
+    let device = hal::pac::Peripherals::take().unwrap();
 
-    loop {}
+    let power = device.PWR.constrain();
+    let power = power.smps().freeze();
+    let rcc = device.RCC.constrain();
+    let clocks = rcc
+        .use_hse(25.MHz())
+        .bypass_hse()
+        .sys_ck(400.MHz())
+        .freeze(power, &device.SYSCFG);
+
+    let i2c = configure_audio_control_i2c(
+        device.I2C4,
+        device.GPIOD,
+        clocks.peripheral.GPIOD,
+        clocks.peripheral.I2C4,
+        &clocks.clocks,
+    );
+    let mut delay = core.SYST.delay(clocks.clocks);
+    let mut codec = Wm8994::new(i2c);
+
+    // Configure the control plane now, but remain muted until SAI/DMA starts
+    // supplying stable clocks and valid PCM data.
+    if codec.configure_headphone_playback(&mut delay, 70).is_err() {
+        loop {
+            cortex_m::asm::wfi();
+        }
+    }
+
+    loop {
+        cortex_m::asm::wfi();
+    }
 }

@@ -3419,6 +3419,7 @@ dependencies = [
  "cortex-m",
  "cortex-m-rt",
  "embedded-alloc",
+ "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "engine",
  "midi",

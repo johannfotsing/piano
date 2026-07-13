@@ -16,6 +16,7 @@ cortex-m-rt = "0.7"
 panic-halt = "1"
 
 embedded-hal = "1"
+embedded-hal-02 = { package = "embedded-hal", version = "0.2.7" }
 embedded-alloc = "0.6"
 
 stm32h7xx-hal = { version = "0.16", default-features = false, features = ["stm32h747cm7", "rt"] }

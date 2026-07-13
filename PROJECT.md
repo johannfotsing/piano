@@ -225,11 +225,7 @@ Add:
 
 At this point, you're building a real synthesizer.
 
----
-
-## CHAT GPT's project roadmap
-
-Phase 10 – Embedded Preparation
+## Phase 10 – Embedded Preparation
 
 Now make:
 
@@ -251,7 +247,9 @@ Desktop still works.
 
 This is a significant milestone because it proves your core logic is portable.
 
-Phase 11 – STM32
+---
+
+## Phase 11 – STM32
 
 Port the desktop application.
 
@@ -261,7 +259,7 @@ Cortex-M4 for later control/UI work.
 - [x] Select the STM32H747 M7 HAL/PAC and memory map
 - [ ] Configure power, clocks, caches, and a diagnostic LED/log channel
 - [x] Add a fixed-capacity allocator for the engine's `alloc` requirements
-- [ ] Configure the board audio codec over I2C
+- [x] Configure the board audio codec over I2C
 - [ ] Stream silent stereo buffers over SAI using DMA
 - [ ] Render the engine into DMA buffers without allocating in the audio path
 - [ ] Add MIDI and physical controls
@@ -284,6 +282,10 @@ with
 GPIO
 
 Everything else stays the same.
+
+
+
+## CHAT GPT's project roadmap
 
 Phase 12 – Hardware Instrument
 
